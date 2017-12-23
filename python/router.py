@@ -6,19 +6,27 @@ class router(object):
     # Data Members
     name = ''
     route_table = []
-    thread_pool = []
+    threads = []
     topo_table = []
     mode = '' # 'dv' or 'ls'
+    timers = []
 
     def __init__(self, object):
         self.name = object.name
         self.mode = object.mode
     
+    # Control
+    def reset_rt(self):
+        pass
+
     def run(self):
         """
         Launch the router.
         """
         self.listen_on()
+
+    def down(self):
+        pass
 
     # Route Part
     def get_addr(self, dest):
@@ -61,9 +69,4 @@ class router(object):
         pass
     
     def encode_dgram(self, data):
-        pass
-
-
-    # Control
-    def reset_rt(self):
         pass
