@@ -2,11 +2,17 @@ var dgram = require('dgram');
 
 class Router {
     constructor() {
-        this.routeName = '';
-        this.routeTable = {};
+        this.name = '';
+        this.port = '';
+        this.routeTable = [];
         this.TopoGraph = {}; // 邻接表存储，仅当 LS 状态使用
         this.mode = ''; // 算法：'ls' | 'dv'
     }
+
+    /**
+     * Control Part
+     * - control and config the router
+     */
 
     /**
      * Launch the router
@@ -26,6 +32,21 @@ class Router {
     }
 
     /**
+     * Conect to a router
+     * @param {String} routerName
+     * @param {number} routerPort
+     */
+
+    connectRouter(routerInfo) {
+        this.routeTable.push({
+            type: 'C',
+            name: routerInfo.name,
+            cost: cost,
+            port: routerInfo.port
+        })
+    }
+
+    /**
      * Main program uses this to send a packet to another router.
      * 
      * @param {String} msg message to send
@@ -36,6 +57,13 @@ class Router {
         let msg;
         sendTo(dest, msg);
     }
+
+    /**
+     * Route Part
+     * - broadcasts the packet of specific algorithm
+     * - update the router's route table
+     * - route
+     */
 
     /** @param {String} destRouter */
 
@@ -49,9 +77,29 @@ class Router {
 
     }
 
+    /**
+     * 
+     */
+    broadcastDV() {
+        for (var entry in this.routeTable) {
+            if (entry.type === 'C') {
+                sendTo(entry.port, genDVPacket())
+            }
+        }
+    }
+
+    genDVPacket() {
+
+    }
+
     LSUpdateRouteTable(LSPacket) {
 
     }
+
+    /**
+     * IO Part
+     * This part of methods is in charge of IO
+     */
 
     /**
      * @param {String} dest dest router name
@@ -71,4 +119,16 @@ class Router {
             
         });
     }
+
+    /**
+     * Info Part
+     * - give related information
+     */
+
+     get routerInfo() {
+         return {
+             name: this.name,
+             port: this.port
+         }
+     }
 }
