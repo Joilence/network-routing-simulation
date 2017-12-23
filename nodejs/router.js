@@ -1,26 +1,58 @@
+import { setInterval } from 'timers';
+
 var dgram = require('dgram');
 
 class Router {
-    constructor() {
-        this.name = '';
-        this.port = '';
-        this.routeTable = [];
-        this.TopoGraph = {}; // 邻接表存储，仅当 LS 状态使用
-        this.mode = ''; // 算法：'ls' | 'dv'
+    /**
+     * @description 路由器监听通告的端口，我们用此整数作为路由器的标志
+     * @memberof Router
+     */
+    port;
+    /**
+     * @description 直连的路由器。
+     * 算法为ls时，直接将它广播（当然，还要附带本路由器的port）
+     * type: [{port, cost}]
+     * @memberof Router
+     */
+    neighbors;
+    /**
+     * @description 路由算法：'ls' | 'dv'
+     * @memberof Router
+     */
+    algorithm;
+    /**
+     * @description 邻接链表。仅在算法为ls时使用。
+     * type: [{port, neighbors}]
+     * @memberof Router
+     */
+    adjacencyList;
+    /**
+     * @description 路由表。用来转发数据包。
+     * @memberof Router
+     */
+    routesTable;
+
+    constructor(port = -1, neighbors = [], algorithm = 'ls') {
+        this.port = port;
+        this.neighbors = neighbors;
+        this.algorithm = algorithm;
+        this.adjacencyList = [];
+        this.routesTable = [];
     }
 
-    /**
-     * Control Part
-     * - control and config the router
-     */
-
-    /**
-     * Launch the router
-     */
-
     run(params) {
+        listenOn(this.port);
+        setInterval(this.LSBroadcastLinkState.bind(this), 30*1000);
+    }
 
-        listenOn();
+    LSBroadcastLinkState() {
+        this.neighbors.forEach(neighbor => {
+            this.sendTo(neighbor.port, {
+                protocol: 'ls',
+                origin: this.port,
+                neighbors: this.neighbors
+            });
+        })
     }
 
     /**
@@ -108,16 +140,19 @@ class Router {
 
     sendTo(destRouter, msg) {
         var socket = dgram.createSocket('udp4');
-        var destPort = getDestPort(destRouter);
-        socket.send(msg, destPort, '127.0.0.1');
+        socket.send(JSON.stringify(msg), destRouter, '127.0.0.1');
     }
 
     listenOn(port) {
-        var socketIn = dgram.createSocket('udp4');
-        socketIn.bind(port)
-        socketIn.on('message', function(msg, rinfo) {
-            
+        var server = dgram.createSocket('udp4');
+        server.on('listening', () => {
+            const address = server.address();
+            console.log(`服务器监听 ${address.address}:${address.port}`);
         });
+        server.on('message', (msg, rinfo) => {
+            console.log(`服务器收到：${msg} 来自 ${rinfo.address}:${rinfo.port}`);
+        });
+        server.bind(port);
     }
 
     /**
