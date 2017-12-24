@@ -91,7 +91,6 @@ class Router {
     /** @param {String} destRouter */
 
     getDestPort(destRouter) {
-
     }
 
     /** @param {Object} DVPacket */
@@ -105,12 +104,21 @@ class Router {
      */
     DVBroadcastState() {
         this.neighbors.forEach(element => {
-            this.sendTo(neighbor.port, routeTable)
+            this.sendTo(neighbor.port, genDVPacket())
         });
     }
 
+    /**
+     * Generate DV state packet to broadcast
+     */
     genDVPacket() {
-        
+        var DVTable = [];
+        this.routeTable.forEach(element => {
+            DVTable.push({
+                dest: element.dest,
+                cost: element.cost
+            })
+        });
     }
 
     LSUpdateRouteTable(LSPacket) {
