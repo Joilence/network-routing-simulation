@@ -95,33 +95,7 @@ class Router {
     getDestPort(destRouter) {
     }
 
-    /** @param {Object} DVPacket */
-
-    DVUpdateRouteTable(DVPacket) {
-
-    }
-
-    /**
-     * Broadcast DV Packet periodically
-     */
-    DVBroadcastState() {
-        this.neighbors.forEach(element => {
-            this.sendTo(neighbor.port, genDVPacket())
-        });
-    }
-
-    /**
-     * Generate DV state packet to broadcast
-     */
-    genDVPacket() {
-        var DVTable = [];
-        this.routeTable.forEach(element => {
-            DVTable.push({
-                dest: element.dest,
-                cost: element.cost
-            })
-        });
-    }
+    
 
     LSUpdateRouteTable(LSPacket) {
 
