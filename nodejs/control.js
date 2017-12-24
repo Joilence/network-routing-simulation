@@ -27,20 +27,27 @@ exports.reset = function reset() {
   if (this.state === true) {
     this.shutdown();
   }
-  this.neighbors.length = 0;
+  this.neighbours.length = 0;
   this.routeTable.clear();
   console.log(`${this.logHead()} has cleared.`);
 }
 
-exports.connect = function connect(params) {
-  this.neighbors.push({
-    name: routerInfo.name,
+/**
+ * 
+ * @param { {name, port} } router 
+ */
+exports.connect = function connect(router, cost) {
+  // Add into neighbours
+  this.neighbours.push({
+    name: router.name,
     cost: cost,
-    port: routerInfo.port
+    port: router.port
   })
+  // Add into route table
+  this.routeTable.
 }
 
-exports.disconnect = function disconnect(params) {
+exports.disconnect = function disconnect(router) {
 
 }
 

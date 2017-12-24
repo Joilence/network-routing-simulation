@@ -28,13 +28,13 @@ exports.DVUpdateRouteTable = function DVUpdateRouteTable(DVStateTable, fromPort)
                dest: element.dest,
                cost: element.cost,
                toPort: fromPort,
-               ttl: 50
+               timestamp: new Date()
             });
         } else if (routeEntry.cost > element.cost) {
             // Found entry with higher cost, and update it
             routeEntry.cost = element.cost;
             routeEntry.toPort = fromPort;
-            routeEntry.ttl = 50;
+            routeEntry.timestamp = new Date();
         }
     });
 }

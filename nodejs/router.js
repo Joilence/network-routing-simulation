@@ -22,7 +22,7 @@ class Router {
      * @type {[{name, port, cost}]}
      * @memberof Router
      */
-    neighbors;
+    neighbours;
 
     /**
      * @description 路由算法：'ls' | 'dv'
