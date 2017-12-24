@@ -1,4 +1,6 @@
-import { setInterval } from 'timers';
+import {
+    setInterval
+} from 'timers';
 
 var dgram = require('dgram');
 
@@ -42,7 +44,7 @@ class Router {
 
     run(params) {
         listenOn(this.port);
-        setInterval(this.LSBroadcastLinkState.bind(this), 30*1000);
+        setInterval(this.LSBroadcastLinkState.bind(this), 30 * 1000);
     }
 
     
@@ -158,6 +160,10 @@ class Router {
         });
         server.on('message', (msg, rinfo) => {
             console.log(`服务器收到：${msg} 来自 ${rinfo.address}:${rinfo.port}`);
+            var packet = JSON.parse(msg);
+            if (packet.protocol === 'ls') {
+                this.LSHandlePacket(packet);
+            }
         });
         server.bind(port);
     }
@@ -167,10 +173,10 @@ class Router {
      * - give related information
      */
 
-     get routerInfo() {
-         return {
-             name: this.name,
-             port: this.port
-         }
-     }
+    get routerInfo() {
+        return {
+            name: this.name,
+            port: this.port
+        }
+    }
 }
