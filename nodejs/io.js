@@ -6,7 +6,7 @@
 exports.sendTo = function sendTo(dest, data) {
     // Query route table
     var entry = this.routeTable.get(dest);
-    var outPort = 0;
+    var outPort = -1;
     if (entry) {
         outPort = entry.toPort;
     } else {
