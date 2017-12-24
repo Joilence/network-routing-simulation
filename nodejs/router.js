@@ -62,7 +62,7 @@ class Router {
      */
 
     shutdown(params) {
-        
+
     }
 
     /**
@@ -166,10 +166,10 @@ class Router {
      * - give related information
      */
 
-     get routerInfo() {
-         return {
-             name: this.name,
-             port: this.port
-         }
-     }
+    get routerInfo() {
+        return {
+            name: this.name,
+            port: this.port
+        }
+    }
 }
