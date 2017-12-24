@@ -11,7 +11,7 @@ class Router {
     /**
      * @description 直连的路由器。
      * 算法为ls时，直接将它广播（当然，还要附带本路由器的port）
-     * type: [{port, cost}]
+     * type: [{name, port, cost}]
      * @memberof Router
      */
     neighbors;
@@ -30,14 +30,14 @@ class Router {
      * @description 路由表。用来转发数据包。
      * @memberof Router
      */
-    routesTable;
+    routeTable;
 
     constructor(port = -1, neighbors = [], algorithm = 'ls') {
         this.port = port;
         this.neighbors = neighbors;
         this.algorithm = algorithm;
         this.adjacencyList = [];
-        this.routesTable = [];
+        this.routeTable = [];
     }
 
     run(params) {
@@ -45,22 +45,14 @@ class Router {
         setInterval(this.LSBroadcastLinkState.bind(this), 30*1000);
     }
 
-    LSBroadcastLinkState() {
-        this.neighbors.forEach(neighbor => {
-            this.sendTo(neighbor.port, {
-                protocol: 'ls',
-                origin: this.port,
-                neighbors: this.neighbors
-            });
-        })
-    }
+    
 
     /**
      * Shutdown the router
      */
 
     shutdown(params) {
-        
+        // Stop all the timer
     }
 
     /**
@@ -70,8 +62,7 @@ class Router {
      */
 
     connectRouter(routerInfo) {
-        this.routeTable.push({
-            type: 'C',
+        this.neighbors.push({
             name: routerInfo.name,
             cost: cost,
             port: routerInfo.port
@@ -110,22 +101,30 @@ class Router {
     }
 
     /**
-     * 
+     * Broadcast DV Packet periodically
      */
-    broadcastDV() {
-        for (var entry in this.routeTable) {
-            if (entry.type === 'C') {
-                sendTo(entry.port, genDVPacket())
-            }
-        }
+    DVBroadcastState() {
+        this.neighbors.forEach(element => {
+            this.sendTo(neighbor.port, routeTable)
+        });
     }
 
     genDVPacket() {
-
+        
     }
 
     LSUpdateRouteTable(LSPacket) {
 
+    }
+
+    LSBroadcastLinkState() {
+        this.neighbors.forEach(neighbor => {
+            this.sendTo(neighbor.port, {
+                protocol: 'ls',
+                origin: this.port,
+                neighbors: this.neighbors
+            });
+        })
     }
 
     /**
