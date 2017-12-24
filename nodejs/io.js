@@ -4,6 +4,7 @@
  * @param {Object} data The data object to send
  */
 exports.sendTo = function sendTo(dest, data) {
+    console.log(`${this.logHead()} sending ${data} to ${dest}`);
     // Query route table
     var entry = this.routeTable.get(dest);
     var outPort = -1;
@@ -16,7 +17,7 @@ exports.sendTo = function sendTo(dest, data) {
     // Get out port number and send packet
     var socket = dgram.createSocket('udp4');
     socket.send(JSON.stringify(data), outPort, '127.0.0.1');
-    console.log(`${this.logHead()} send ${data.protocol} packet to ${outPort}`);
+    console.log(`${this.logHead()} has sent ${data.protocol} packet to ${outPort}`);
 }
 
 /**

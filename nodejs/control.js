@@ -38,25 +38,35 @@ exports.reset = function reset() {
  */
 exports.connect = function connect(router, cost) {
   // Add into neighbors
-  this.neighbors.push({
-    name: router.name,
-    cost: cost,
-    port: router.port
-  })
+  this.neighbors.set(router.port, cost);
   // Add into route table
-  this.routeTable.
+  this.routeTable.set(router.port, {
+    cost: cost,
+    toPort: router.port,
+    timestamp: undefined
+  });
+  console.log(`${this.logHead()} connect with ${router.port}`);
 }
 
 exports.disconnect = function disconnect(router) {
-
+    this.neighbors.delete(router.port);
+    this.routeTable.delete(router.port);
+    console.log(`${this.logHead()} disconnect with ${router.port}`);
 }
 
 exports.switchTo = function switchTo(algorithm) {
-
+    console.log(`${this.logHead()} resetting...`);
+    this.reset();
+    this.algorithm = algorithm;
+    this.run();
+    console.log(`${this.logHead()} reset to ${algorithm}`);
 }
 
-exports.sendPacket = function sendPacket() {
-
+exports.sendPacket = function sendPacket(dest, msg) {
+    this.sendTo(dest, {
+        src: this.port,
+        dest: dest,
+        protocol: 'data',
+        msg: msg
+    });
 }
-
-exports.getDestPort = function (routerName) {}

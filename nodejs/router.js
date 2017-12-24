@@ -19,7 +19,7 @@ class Router {
     /**
      * @description 直连的路由器。
      * 算法为ls时，直接将它广播（当然，还要附带本路由器的port）
-     * @type {[{name, port, cost}]}
+     * @type {Map<routerPort, cost>}
      * @memberof Router
      */
     neighbors;
@@ -40,7 +40,7 @@ class Router {
 
     /**
      * @description 路由表。用来转发数据包。
-     * @type {Map<port, {}>}
+     * @type {Map<dest, {cost, toPort, timestamp}>}
      * @memberof Router
      */
     routeTable;
