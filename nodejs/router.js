@@ -3,6 +3,10 @@ import {
 } from 'timers';
 
 var dgram = require('dgram');
+var control = require('./control');
+var io = require('./io');
+var ls = require('./ls-route');
+var dv = require('./dv-route');
 
 class Router {
     /**
@@ -39,140 +43,13 @@ class Router {
         this.neighbors = neighbors;
         this.algorithm = algorithm;
         this.adjacencyList = [];
-        this.routeTable = [];
-    }
-
-    run(params) {
-        listenOn(this.port);
-        setInterval(this.LSBroadcastLinkState.bind(this), 30 * 1000);
-    }
-
-    
-
-    /**
-     * Shutdown the router
-     */
-
-    shutdown(params) {
-        // Stop all the timer
-    }
-
-    /**
-     * Conect to a router
-     * @param {String} routerName
-     * @param {number} routerPort
-     */
-
-    connectRouter(routerInfo) {
-        this.neighbors.push({
-            name: routerInfo.name,
-            cost: cost,
-            port: routerInfo.port
-        })
-    }
-
-    /**
-     * Main program uses this to send a packet to another router.
-     * 
-     * @param {String} msg message to send
-     * @param {String} dest dest router address
-     */
-
-    sendPacket(data, dest) {
-        let msg;
-        sendTo(dest, msg);
-    }
-
-    /**
-     * Route Part
-     * - broadcasts the packet of specific algorithm
-     * - update the router's route table
-     * - route
-     */
-
-    /** @param {String} destRouter */
-
-    getDestPort(destRouter) {
-    }
-
-    /** @param {Object} DVPacket */
-
-    DVUpdateRouteTable(DVPacket) {
-
-    }
-
-    /**
-     * Broadcast DV Packet periodically
-     */
-    DVBroadcastState() {
-        this.neighbors.forEach(element => {
-            this.sendTo(neighbor.port, genDVPacket())
-        });
-    }
-
-    /**
-     * Generate DV state packet to broadcast
-     */
-    genDVPacket() {
-        var DVTable = [];
-        this.routeTable.forEach(element => {
-            DVTable.push({
-                dest: element.dest,
-                cost: element.cost
-            })
-        });
-    }
-
-    LSUpdateRouteTable(LSPacket) {
-
-    }
-
-    LSBroadcastLinkState() {
-        this.neighbors.forEach(neighbor => {
-            this.sendTo(neighbor.port, {
-                protocol: 'ls',
-                origin: this.port,
-                neighbors: this.neighbors
-            });
-        })
-    }
-
-    /**
-     * IO Part
-     * This part of methods is in charge of IO
-     */
-
-    /**
-     * @param {String} dest dest router name
-     * @param {String} msg message to send
-     */
-
-    sendTo(destRouter, msg) {
-        var socket = dgram.createSocket('udp4');
-        socket.send(JSON.stringify(msg), destRouter, '127.0.0.1');
-    }
-
-    listenOn(port) {
-        var server = dgram.createSocket('udp4');
-        server.on('listening', () => {
-            const address = server.address();
-            console.log(`服务器监听 ${address.address}:${address.port}`);
-        });
-        server.on('message', (msg, rinfo) => {
-            console.log(`服务器收到：${msg} 来自 ${rinfo.address}:${rinfo.port}`);
-            var packet = JSON.parse(msg);
-            if (packet.protocol === 'ls') {
-                this.LSHandlePacket(packet);
-            }
-        });
-        server.bind(port);
+        this.routeTable = new Map();
     }
 
     /**
      * Info Part
      * - give related information
      */
-
     get routerInfo() {
         return {
             name: this.name,
@@ -180,3 +57,5 @@ class Router {
         }
     }
 }
+
+Router.prototype = Object.create(Router.prototype, control, io, ls, dv);
