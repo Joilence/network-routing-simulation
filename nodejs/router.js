@@ -28,12 +28,13 @@ class Router {
     algorithm;
     /**
      * @description 邻接链表。仅在算法为ls时使用。
-     * type: [{port, neighbors}]
+     * type: Map<port, {neighbors}>
      * @memberof Router
      */
     adjacencyList;
     /**
      * @description 路由表。用来转发数据包。
+     * type: Map<port, {}>
      * @memberof Router
      */
     routeTable;
@@ -42,7 +43,7 @@ class Router {
         this.port = port;
         this.neighbors = neighbors;
         this.algorithm = algorithm;
-        this.adjacencyList = [];
+        this.adjacencyList = new Map();
         this.routeTable = new Map();
     }
 
@@ -55,6 +56,10 @@ class Router {
             name: this.name,
             port: this.port
         }
+    }
+
+    get logHead() {
+        return `${this.name} : ${this.port} - `;
     }
 }
 
