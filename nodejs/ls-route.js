@@ -1,22 +1,22 @@
 exports.LSBroadcastState = function LSBroadcastState() {
-  this.neighbors.forEach(neighbor => {
-    this.sendTo(neighbor.port, {
+  this.neighbours.forEach(neighbour => {
+    this.sendTo(neighbour.port, {
       protocol: 'ls',
       origin: this.port,
-      neighbors: this.neighbors
+      neighbours: this.neighbours
     });
   });
 }
 
 exports.LSUpdateRouteTable = function LSUpdateRouteTable(packet) {
-  this.adjacencyList.get(packet.origin).neighbors = packet.neighbors;
+  this.adjacencyList.get(packet.origin).neighbours = packet.neighbours;
   this.runDijkstra();
 }
 
 exports.runDijkstra = function runDijkstra() {
   // 初始化current_dist
   const current_dist = new Map();
-  this.adjacencyList.forEach((neighbors, port) => {
+  this.adjacencyList.forEach((neighbours, port) => {
     current_dist.set(port, {
       port: port,
       cost: Number.MAX_SAFE_INTEGER,
@@ -45,13 +45,13 @@ exports.runDijkstra = function runDijkstra() {
     const expandingDistInfo = current_dist.get(expandingRouter);
     expandingDistInfo.hasExpanded = true;
 
-    const neighbors = this.adjacencyList.get(expandingRouter);
-    neighbors.forEach((neighbor) => {
-      const neighborDistInfo = current_dist.get(neighbor.port);
-      if (neighborDistInfo.cost > expandingDistInfo.cost + neighbor.cost) {
-        // neighbor与原点的距离 > expandingRouter与原点的距离 + expandingRouter与neighbor的距离
-        neighborDistInfo.cost = expandingDistInfo.cost + neighbor.cost;
-        neighborDistInfo.nextHop = expandingRouter.nextHop;
+    const neighbours = this.adjacencyList.get(expandingRouter);
+    neighbours.forEach((neighbour) => {
+      const neighbourDistInfo = current_dist.get(neighbour.port);
+      if (neighbourDistInfo.cost > expandingDistInfo.cost + neighbour.cost) {
+        // neighbour与原点的距离 > expandingRouter与原点的距离 + expandingRouter与neighbour的距离
+        neighbourDistInfo.cost = expandingDistInfo.cost + neighbour.cost;
+        neighbourDistInfo.nextHop = expandingRouter.nextHop;
       }
     });
   }

@@ -27,7 +27,7 @@ exports.reset = function reset() {
   if (this.state === true) {
     this.shutdown();
   }
-  this.neighbours.length = 0;
+  this.neighbors.length = 0;
   this.routeTable.clear();
   console.log(`${this.logHead()} has cleared.`);
 }
@@ -37,8 +37,8 @@ exports.reset = function reset() {
  * @param { {name, port} } router 
  */
 exports.connect = function connect(router, cost) {
-  // Add into neighbours
-  this.neighbours.push({
+  // Add into neighbors
+  this.neighbors.push({
     name: router.name,
     cost: cost,
     port: router.port
