@@ -62,6 +62,46 @@ class Router {
      */
 
     shutdown(params) {
+        
+    }
+
+    /**
+     * Conect to a router
+     * @param {String} routerName
+     * @param {number} routerPort
+     */
+
+    connectRouter(routerInfo) {
+        this.routeTable.push({
+            type: 'C',
+            name: routerInfo.name,
+            cost: cost,
+            port: routerInfo.port
+        })
+    }
+
+    /**
+     * Main program uses this to send a packet to another router.
+     * 
+     * @param {String} msg message to send
+     * @param {String} dest dest router address
+     */
+
+    sendPacket(data, dest) {
+        let msg;
+        sendTo(dest, msg);
+    }
+
+    /**
+     * Route Part
+     * - broadcasts the packet of specific algorithm
+     * - update the router's route table
+     * - route
+     */
+
+    /** @param {String} destRouter */
+
+    getDestPort(destRouter) {
 
     }
 
@@ -71,10 +111,34 @@ class Router {
 
     }
 
-    LSHandlePacket(LSPacket) {
-        this.adjacencyList
+    /**
+     * 
+     */
+    broadcastDV() {
+        for (var entry in this.routeTable) {
+            if (entry.type === 'C') {
+                sendTo(entry.port, genDVPacket())
+            }
+        }
     }
 
+    genDVPacket() {
+
+    }
+
+    LSUpdateRouteTable(LSPacket) {
+
+    }
+
+    /**
+     * IO Part
+     * This part of methods is in charge of IO
+     */
+
+    /**
+     * @param {String} dest dest router name
+     * @param {String} msg message to send
+     */
 
     sendTo(destRouter, msg) {
         var socket = dgram.createSocket('udp4');
@@ -96,4 +160,16 @@ class Router {
         });
         server.bind(port);
     }
+
+    /**
+     * Info Part
+     * - give related information
+     */
+
+     get routerInfo() {
+         return {
+             name: this.name,
+             port: this.port
+         }
+     }
 }
