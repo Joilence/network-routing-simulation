@@ -14,7 +14,7 @@ import { Address } from "cluster";
 // let ls = require('./ls-route');
 // let dv = require('./dv-route');
 
-class Router {
+export class Router {
   /**
    * @description 路由器监听通告的端口，我们用此整数作为路由器的标志
    */
@@ -92,8 +92,8 @@ class Router {
 
   constructor(port: number,
     // name: string,
-    neighbors: Neighbor[],
-    algorithm: RoutingAlgorithm,
+    neighbors: Neighbor[] = [],
+    algorithm: RoutingAlgorithm = RoutingAlgorithm.ls,
     isCenter?: boolean,
     centerPort?: number) {
     this.port = port;
