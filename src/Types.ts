@@ -15,6 +15,8 @@ export enum RoutingAlgorithm {
 }
 
 export interface Packet<T> {
+  src: number;
+  dest: number;
   protocol: RoutingAlgorithm | 'data';
   data: T;
 }

@@ -13,7 +13,7 @@ import {
 // let ls = require('./ls-route');
 // let dv = require('./dv-route');
 
-class Router {
+export class Router {
   /**
    * @description 路由器监听通告的端口，我们用此整数作为路由器的标志
    */
@@ -91,8 +91,8 @@ class Router {
 
   constructor(port: number,
     // name: string,
-    neighbors: Neighbor[],
-    algorithm: RoutingAlgorithm,
+    neighbors: Neighbor[] = [],
+    algorithm: RoutingAlgorithm = RoutingAlgorithm.ls,
     isCenter?: boolean,
     centerPort?: number) {
     this.port = port;
@@ -185,6 +185,8 @@ class Router {
 
   public sendMessage(dest: number, msg: string) {
     this.sendTo(dest, {
+      src: this.port,
+      dest: dest,
       protocol: 'data',
       data: msg
     });
@@ -228,20 +230,21 @@ class Router {
       throw new Error("从一个不是邻居的节点收到数据包");
     }
     if (packet.protocol === RoutingAlgorithm.ls) {
+      //TODO: handle single-direction connection state information
+      // when a router shutdown after it sends LS state
+      // and its neighbors send LS state then
+      // handle this single-direction connection in the first LS state
       this.LSUpdateRouteTable(packet, remoteInfo);
     } else if (packet.protocol === RoutingAlgorithm.dv) {
       this.DVUpdateRouteTable(packet, remoteInfo);
-    }
-    /*
-    else if (packet.protocol === 'data') {
-      if (remoteInfo.port === this.port) {
-        console.log(`${this.logHead} receive message ${packet.msg}`);
+    } else if (packet.protocol === 'data') {
+      if (remoteInfo.port === this.port) { // pkt to me
+        console.log(`${this.logHead} receive message ${packet.data}`);
         //TODO: store received message
-      } else {
-        this.sendTo(dest, packet);
+      } else { // pkt to forward
+        this.sendTo(packet.dest, packet);
       }
     }
-    */
     else if (packet.protocol === RoutingAlgorithm.centralized) {
       if (!this.isCenter) {
         throw new Error('非中心路由接收到路由通告，可能是有路由器的“centerPort”字段配置错误');
@@ -258,6 +261,8 @@ class Router {
     console.log(`${this.logHead} + start DV broadcast`);
     this.neighbors.forEach(neighbor => {
       this.sendTo(neighbor.port, {
+        src: this.port,
+        dest: neighbor.port,
         protocol: RoutingAlgorithm.dv,
         data: this.generateDV(neighbor.port)
       });
@@ -317,6 +322,8 @@ class Router {
     };
     this.neighbors.forEach(neighbor => {
       this.sendTo(neighbor.port, {
+        src: this.port,
+        dest: neighbor.port,
         protocol: RoutingAlgorithm.ls,
         data: linkState
       });
