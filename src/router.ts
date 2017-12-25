@@ -230,7 +230,7 @@ export class Router {
       throw new Error("从一个不是邻居的节点收到数据包");
     }
     if (packet.protocol === RoutingAlgorithm.ls) {
-      //TODO: handle single-direction connection state information
+      // TODO: handle single-direction connection state information
       // when a router shutdown after it sends LS state
       // and its neighbors send LS state then
       // handle this single-direction connection in the first LS state
@@ -240,7 +240,7 @@ export class Router {
     } else if (packet.protocol === 'data') {
       if (remoteInfo.port === this.port) { // pkt to me
         console.log(`${this.logHead} receive message ${packet.data}`);
-        //TODO: store received message
+        // TODO: store received message
       } else { // pkt to forward
         this.sendTo(packet.dest, packet);
       }
