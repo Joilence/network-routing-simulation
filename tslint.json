@@ -15,7 +15,8 @@
         "eofline": false,
         "no-angle-bracket-type-assertion": false,
         "one-line": false,
-        "arrow-parens": false
+        "arrow-parens": false,
+        "member-ordering": false
     },
     "rulesDirectory": []
 }
