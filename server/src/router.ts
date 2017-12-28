@@ -453,7 +453,7 @@ export class Router {
 
   private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
     if (this.algorithm !== RoutingAlgorithm.dv) {
-      throw new Error("方法调用错了！");
+      throw new Error(`${this.logHead} Calling respondToNeighborsDVsChange() when the mode is not 'dv'!`);
     }
     const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
     if (this.DVhasChanged(this.routeTable, newRouteTable)) {
@@ -471,20 +471,25 @@ export class Router {
    */
   private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
     if (oldRouteTable.size !== newRouteTable.size) {
-      return false;
+      console.log(`${this.logHead} The new route table has changed!`);
+      return true;
     } else if (oldRouteTable.keys.length !== newRouteTable.keys.length) {
-      return false;
+      console.log(`${this.logHead} The new route table has changed!`);
+      return true;
     } else {
       oldRouteTable.forEach((val, key) => {
         const newEntry = newRouteTable.get(key);
         if (newEntry === undefined) {
-          return false;
+          console.log(`${this.logHead} The new route table has changed!`);
+          return true;
         } else if (newEntry.cost !== val.cost || newEntry.nextHop !== val.nextHop) {
-          return false;
+          console.log(`${this.logHead} The new route table has changed!`);
+          return true;
         }
-      })
+      });
     }
-    return true;
+    console.log(`${this.logHead} The new route table is the same with the old.`);
+    return false;
   }
 
   /**
