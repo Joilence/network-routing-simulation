@@ -380,10 +380,12 @@ export class Router {
     // Add DV of new neighbors
     neighbors.forEach((value, key, map) => {
       if (this.neighborsDVs.get(key) === undefined) {
-        this.neighborsDVs.set(key, {
+        let newDV: DV = new Map();
+        newDV.set(key, {
           cost: value.cost,
           dest: value.dest
-        });
+        })
+        this.neighborsDVs.set(key, newDV);
       }
     });
     // Update route table because neighborsDV change
