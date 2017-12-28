@@ -499,7 +499,25 @@ export class Router {
    * @param {Map<number, DV>} neighborsDVs
    */
   private DVComputeRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>): RouteTable {
-    
+    if (neighbors.size !== neighborsDVs.keys.length) {
+      throw new Error(`${this.logHead} neighbors.size != neighborsDVs.keys.length!`);
+    }
+    const newRouteTable: RouteTable = new Map();
+    neighborsDVs.forEach((dv, neighbor) => {
+      if (neighbors.get(neighbor) === undefined) {
+        throw new Error(`${this.logHead} neighbor found in neighborsDVs is not found in neighbors!`);
+      }
+      dv.forEach((item, dest) => {
+        let rtItem = newRouteTable.get(dest);
+        if (rtItem === undefined) {
+          newRouteTable.set(dest, {dest: dest, cost: item.cost, nextHop: neighbor});
+        } else if (rtItem.cost > item.cost) {
+          rtItem.cost = item.cost;
+          rtItem.nextHop = neighbor;
+        }
+      })
+    })
+    return newRouteTable;
   }
 
   // -----------------------------ls------------------------------------
