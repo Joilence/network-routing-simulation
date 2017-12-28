@@ -451,37 +451,51 @@ export class Router {
     }
   }
 
-  // private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
-  //   if (this.algorithm !== RoutingAlgorithm.dv) {
-  //     throw new Error("方法调用错了！");
-  //   }
-  //   const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
-  //   if (this.DVhasChanged(this.routeTable, newRouteTable)) {
-  //     // 如果新的路由表与之前的路由表相比有发生变化，才发送DV通告
-  //     this.routeTable = newRouteTable;
-  //     this.DVInformNeighbors(newRouteTable);
-  //   }
-  // }
+  private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
+    if (this.algorithm !== RoutingAlgorithm.dv) {
+      throw new Error("方法调用错了！");
+    }
+    const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
+    if (this.DVhasChanged(this.routeTable, newRouteTable)) {
+      // 如果新的路由表与之前的路由表相比有发生变化，才发送DV通告
+      this.routeTable = newRouteTable;
+      this.DVInformNeighbors(newRouteTable);
+    }
+  }
 
-  // /**
-  //  * @description 工具函数，新的路由表（自己的DV）与之前的路由表相比，有没有发生变化
-  //  * @private
-  //  * @param {RouteTable} oldRouteTable
-  //  * @param {RouteTable} newRouteTable
-  //  */
-  // private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
+  /**
+   * @description 工具函数，新的路由表（自己的DV）与之前的路由表相比，有没有发生变化
+   * @private
+   * @param {RouteTable} oldRouteTable
+   * @param {RouteTable} newRouteTable
+   */
+  private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
+    if (oldRouteTable.size !== newRouteTable.size) {
+      return false;
+    } else if (oldRouteTable.keys.length !== newRouteTable.keys.length) {
+      return false;
+    } else {
+      oldRouteTable.forEach((val, key) => {
+        const newEntry = newRouteTable.get(key);
+        if (newEntry === undefined) {
+          return false;
+        } else if (newEntry.cost !== val.cost || newEntry.nextHop !== val.nextHop) {
+          return false;
+        }
+      })
+    }
+    return true;
+  }
 
-  // }
-
-  // /**
-  //  * @description DV算法的实现。
-  //  * @private
-  //  * @param {Neighbors} neighbors
-  //  * @param {Map<number, DV>} neighborsDVs
-  //  */
-  // private DVComputeRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>): RouteTable {
+  /**
+   * @description DV算法的实现。
+   * @private
+   * @param {Neighbors} neighbors
+   * @param {Map<number, DV>} neighborsDVs
+   */
+  private DVComputeRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>): RouteTable {
     
-  // }
+  }
 
   // -----------------------------ls------------------------------------
   /**
