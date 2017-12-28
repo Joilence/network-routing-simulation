@@ -394,28 +394,31 @@ export class Router {
    * @description 根据接收到的dv通告来更新neighborsDVs
    * @private
    */
-  private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dv: DV): void {
-    // TODO: Replace the origin DV
+  private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dvs: DVItem[]): void {
+    this.neighborsDVs.delete(origin);
+    let newDV: DV;
+    dvs.forEach(item => {
+      newDV.set(item.dest, {dest: item.dest, cost: item.cost});
+    });
+    this.neighborsDVs.set(origin, newDV);
     this.DVUpdateRouteTable(this.neighbors, this.neighborsDVs);
   }
 
   /**
-   * @description Update route table by neighbors' DV
-   * Step1: Add new entry for item that added newly into neighbors' DV
-   * Step2: For every entry in route table, compute the min cost and next hop based on all neighbors' DV
+   * @description Compute a new route table by neighbors' DV
    * @param neighbors 
    * @param neighborsDVs 
    */
   private DVUpdateRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
     let dirty: boolean = false;
     // Add new entry for every new item in neighborsDVs
-    neighborsDVs.forEach(DVTable => {
-      DVTable.forEach(item => {
+    neighborsDVs.forEach((DVTable, src) => {
+      DVTable.forEach((item) => {
         if (this.routeTable.get(item.dest) === undefined) {
           this.routeTable.set(item.dest, {
             dest: item.dest,
             cost: item.cost,
-            nextHop: item.src
+            nextHop: src
           });
         }
       });
