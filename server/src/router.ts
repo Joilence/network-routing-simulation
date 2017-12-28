@@ -11,6 +11,7 @@ import {
   LSLinkState,
   RouterState
 } from "./Types";
+import { unwatchFile } from "fs";
 
 export class Router {
   /**
@@ -113,10 +114,11 @@ export class Router {
   get routerInfo() {
     return {
       // name: this.name,
-      port: this.port,
       algorithm: this.algorithm,
-      state: this.state,
       neighbors: this.neighbors,
+      port: this.port,
+      state: this.state,
+
       adjacencyList: Array.from(this.adjacencyList),  // 转化为可JSON化的对象
       routeTable: Array.from(this.routeTable)         // 转化为可JSON化的对象
     };
@@ -305,11 +307,11 @@ export class Router {
       // and its neighbors send LS state then
       // handle this single-direction connection in the first LS state
 
-      // TODO: 广播数据包。为了防止洪范，要在这里丢弃接收过的数据包而不响应
+      // TODO: 广播数据包。为了防止洪泛，要在这里丢弃接收过的数据包而不响应
 
       this.LSUpdateAdjacencyListWithReceivedLS(packet.src, packet.data);
     } else if (packet.protocol === RoutingAlgorithm.dv) {
-      this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, packet.data);
+      this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, (<Packet<DVItem[]>> packet).data);
     } else if (packet.protocol === 'data') {
       if (packet.dest === this.port) { // pkt to me
         console.log(`${this.logHead} receive message ${packet.data}`);
@@ -348,8 +350,8 @@ export class Router {
     routeTable.forEach(routinTableItem => {
       if (routinTableItem.nextHop !== dest) {
         dv.push({
-          dest: routinTableItem.dest,
-          cost: routinTableItem.cost
+          cost: routinTableItem.cost,
+          dest: routinTableItem.dest
         });
       }
     });
@@ -357,13 +359,28 @@ export class Router {
   }
 
   /**
-   * @description 根据neighbors来更新neighborsDVs
+   * @description 当 neighbors 出现更新，根据 neighbors 来更新 neighborsDVs
    * @private
    * @param {Neighbors} neighbors
    */
   private DVUpdateNeighborsDVsWithNeighbors(neighbors: Neighbors): void {
-
-    this.respondToNeighborsDVsChange(neighbors, this.neighborsDVs);
+    // Delete DV of routers that are not neighbors any more
+    this.neighborsDVs.forEach((value, key, map) => {
+      if (neighbors.get(key) === undefined) {
+        this.neighborsDVs.delete(key);
+      }
+    });
+    // Add DV of new neighbors
+    neighbors.forEach((value, key, map) => {
+      if (this.neighborsDVs.get(key) === undefined) {
+        this.neighborsDVs.set(key, {
+          cost: value.cost,
+          dest: value.dest
+        });
+      }
+    });
+    // Update route table because neighborsDV change
+    this.DVUpdateRouteTable(neighbors, this.neighborsDVs);
   }
 
   /**
@@ -371,41 +388,90 @@ export class Router {
    * @private
    */
   private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dv: DV): void {
-
-    this.respondToNeighborsDVsChange(this.neighbors, this.neighborsDVs);
-  }
-
-  private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
-    if (this.algorithm !== RoutingAlgorithm.dv) {
-      throw new Error("方法调用错了！");
-    }
-    const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
-    if (this.DVhasChanged(this.routeTable, newRouteTable)) {
-      // 如果新的路由表与之前的路由表相比有发生变化，才发送DV通告
-      this.routeTable = newRouteTable;
-      this.DVInformNeighbors(newRouteTable);
-    }
+    // TODO: Replace the origin DV
+    this.DVUpdateRouteTable(this.neighbors, this.neighborsDVs);
   }
 
   /**
-   * @description 工具函数，新的路由表（自己的DV）与之前的路由表相比，有没有发生变化
-   * @private
-   * @param {RouteTable} oldRouteTable
-   * @param {RouteTable} newRouteTable
+   * @description Update route table by neighbors' DV
+   * Step1: Add new entry for item that added newly into neighbors' DV
+   * Step2: For every entry in route table, compute the min cost and next hop based on all neighbors' DV
+   * @param neighbors 
+   * @param neighborsDVs 
    */
-  private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
-
+  private DVUpdateRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
+    let dirty: boolean = false;
+    // Add new entry for every new item in neighborsDVs
+    neighborsDVs.forEach(DVTable => {
+      DVTable.forEach(item => {
+        if (this.routeTable.get(item.dest) === undefined) {
+          this.routeTable.set(item.dest, {
+            dest: item.dest,
+            cost: item.cost,
+            nextHop: item.src
+          });
+        }
+      });
+    });
+    // Compute min cost of each dest
+    this.routeTable.forEach(entry => {
+      // Compute min cost of a dest
+      let minDVItem: DVItem;
+      let newNextHop: number;
+      neighborsDVs.forEach((DVTable, neighbor) => {
+        const neighborsDVItem = DVTable.get(entry.dest);
+        if (neighborsDVItem !== undefined) {
+          if (minDVItem === undefined) {
+            minDVItem = neighborsDVItem;
+            newNextHop = neighbor;
+          } else if (minDVItem.cost > neighborsDVItem.cost) {
+            minDVItem = neighborsDVItem;
+            newNextHop = neighbor;
+          }
+        }
+      });
+      if (minDVItem !== undefined && entry.cost > minDVItem.cost) {
+        entry.cost = minDVItem.cost;
+        entry.nextHop = newNextHop;
+        dirty = true;
+      }
+    });
+    if (dirty) {
+      this.DVInformNeighbors(this.routeTable);
+    }
   }
 
-  /**
-   * @description DV算法的实现。
-   * @private
-   * @param {Neighbors} neighbors
-   * @param {Map<number, DV>} neighborsDVs
-   */
-  private DVComputeRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>): RouteTable {
+  // private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
+  //   if (this.algorithm !== RoutingAlgorithm.dv) {
+  //     throw new Error("方法调用错了！");
+  //   }
+  //   const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
+  //   if (this.DVhasChanged(this.routeTable, newRouteTable)) {
+  //     // 如果新的路由表与之前的路由表相比有发生变化，才发送DV通告
+  //     this.routeTable = newRouteTable;
+  //     this.DVInformNeighbors(newRouteTable);
+  //   }
+  // }
 
-  }
+  // /**
+  //  * @description 工具函数，新的路由表（自己的DV）与之前的路由表相比，有没有发生变化
+  //  * @private
+  //  * @param {RouteTable} oldRouteTable
+  //  * @param {RouteTable} newRouteTable
+  //  */
+  // private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
+
+  // }
+
+  // /**
+  //  * @description DV算法的实现。
+  //  * @private
+  //  * @param {Neighbors} neighbors
+  //  * @param {Map<number, DV>} neighborsDVs
+  //  */
+  // private DVComputeRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>): RouteTable {
+    
+  // }
 
   // -----------------------------ls------------------------------------
   /**
