@@ -338,7 +338,7 @@ export class Router {
 
   // -----------------------------dv------------------------------------
   /**
-   * @description dv算法只用将**自己的距离向量**发给**邻居**，不需要广播
+   * @description Broadcast itself DV table to the neighbors
    */
   private DVInformNeighbors(dv: RouteTable) {
     console.log(`${this.logHead} + start DV broadcast`);
