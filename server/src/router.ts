@@ -387,7 +387,11 @@ export class Router {
       }
     });
     // Update route table because neighborsDV change
-    this.DVUpdateRouteTable(neighbors, this.neighborsDVs);
+    const newRouteTable = this.DVComputeRouteTable(neighbors, this.neighborsDVs);
+    if (this.DVhasChanged(this.routeTable, newRouteTable)) {
+      this.routeTable = newRouteTable;
+      this.DVInformNeighbors(newRouteTable);
+    }
   }
 
   /**
@@ -396,60 +400,64 @@ export class Router {
    */
   private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dvs: DVItem[]): void {
     this.neighborsDVs.delete(origin);
-    let newDV: DV;
+    let newDV: DV = new Map();
     dvs.forEach(item => {
       newDV.set(item.dest, {dest: item.dest, cost: item.cost});
     });
     this.neighborsDVs.set(origin, newDV);
-    this.DVUpdateRouteTable(this.neighbors, this.neighborsDVs);
-  }
-
-  /**
-   * @description Compute a new route table by neighbors' DV
-   * @param neighbors 
-   * @param neighborsDVs 
-   */
-  private DVUpdateRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
-    let dirty: boolean = false;
-    // Add new entry for every new item in neighborsDVs
-    neighborsDVs.forEach((DVTable, src) => {
-      DVTable.forEach((item) => {
-        if (this.routeTable.get(item.dest) === undefined) {
-          this.routeTable.set(item.dest, {
-            dest: item.dest,
-            cost: item.cost,
-            nextHop: src
-          });
-        }
-      });
-    });
-    // Compute min cost of each dest
-    this.routeTable.forEach(entry => {
-      // Compute min cost of a dest
-      let minDVItem: DVItem;
-      let newNextHop: number;
-      neighborsDVs.forEach((DVTable, neighbor) => {
-        const neighborsDVItem = DVTable.get(entry.dest);
-        if (neighborsDVItem !== undefined) {
-          if (minDVItem === undefined) {
-            minDVItem = neighborsDVItem;
-            newNextHop = neighbor;
-          } else if (minDVItem.cost > neighborsDVItem.cost) {
-            minDVItem = neighborsDVItem;
-            newNextHop = neighbor;
-          }
-        }
-      });
-      if (minDVItem !== undefined && entry.cost > minDVItem.cost) {
-        entry.cost = minDVItem.cost;
-        entry.nextHop = newNextHop;
-        dirty = true;
-      }
-    });
-    if (dirty) {
-      this.DVInformNeighbors(this.routeTable);
+    const newRouteTable = this.DVComputeRouteTable(this.neighbors, this.neighborsDVs);
+    if (this.DVhasChanged(this.routeTable, newRouteTable)) {
+      this.routeTable = newRouteTable;
+      this.DVInformNeighbors(newRouteTable);
     }
   }
+
+  // /**
+  //  * @description Compute a new route table by neighbors' DV
+  //  * @param neighbors 
+  //  * @param neighborsDVs 
+  //  */
+  // private DVUpdateRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
+  //   let dirty: boolean = false;
+  //   // Add new entry for every new item in neighborsDVs
+  //   neighborsDVs.forEach((DVTable, src) => {
+  //     DVTable.forEach((item) => {
+  //       if (this.routeTable.get(item.dest) === undefined) {
+  //         this.routeTable.set(item.dest, {
+  //           dest: item.dest,
+  //           cost: item.cost,
+  //           nextHop: src
+  //         });
+  //       }
+  //     });
+  //   });
+  //   // Compute min cost of each dest
+  //   this.routeTable.forEach(entry => {
+  //     // Compute min cost of a dest
+  //     let minDVItem: DVItem;
+  //     let newNextHop: number;
+  //     neighborsDVs.forEach((DVTable, neighbor) => {
+  //       const neighborsDVItem = DVTable.get(entry.dest);
+  //       if (neighborsDVItem !== undefined) {
+  //         if (minDVItem === undefined) {
+  //           minDVItem = neighborsDVItem;
+  //           newNextHop = neighbor;
+  //         } else if (minDVItem.cost > neighborsDVItem.cost) {
+  //           minDVItem = neighborsDVItem;
+  //           newNextHop = neighbor;
+  //         }
+  //       }
+  //     });
+  //     if (minDVItem !== undefined && entry.cost > minDVItem.cost) {
+  //       entry.cost = minDVItem.cost;
+  //       entry.nextHop = newNextHop;
+  //       dirty = true;
+  //     }
+  //   });
+  //   if (dirty) {
+  //     this.DVInformNeighbors(this.routeTable);
+  //   }
+  // }
 
   private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
     if (this.algorithm !== RoutingAlgorithm.dv) {
