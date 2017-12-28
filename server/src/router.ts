@@ -122,10 +122,11 @@ export class Router {
   get routerInfo() {
     return {
       // name: this.name,
-      port: this.port,
       algorithm: this.algorithm,
-      state: this.state,
       neighbors: this.neighbors,
+      port: this.port,
+      state: this.state,
+
       adjacencyList: Array.from(this.adjacencyList),  // 转化为可JSON化的对象
       routeTable: Array.from(this.routeTable)         // 转化为可JSON化的对象
     };
@@ -318,7 +319,7 @@ export class Router {
       });
       this.LSUpdateAdjacencyListWithReceivedLS(packet.src, (<Packet<LSLinkState>> packet).data);
     } else if (packet.protocol === RoutingAlgorithm.dv) {
-      this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, packet.data);
+      this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, (<Packet<DVItem[]>> packet).data);
     } else if (packet.protocol === 'data') {
       if (packet.dest === this.port) { // pkt to me
         console.log(`${this.logHead} receive message ${packet.data}`);
@@ -338,7 +339,7 @@ export class Router {
 
   // -----------------------------dv------------------------------------
   /**
-   * @description dv算法只用将**自己的距离向量**发给**邻居**，不需要广播
+   * @description Broadcast itself DV table to the neighbors
    */
   private DVInformNeighbors(dv: RouteTable) {
     console.log(`${this.logHead} + start DV broadcast`);
@@ -357,8 +358,8 @@ export class Router {
     routeTable.forEach(routinTableItem => {
       if (routinTableItem.nextHop !== dest) {
         dv.push({
-          dest: routinTableItem.dest,
-          cost: routinTableItem.cost
+          cost: routinTableItem.cost,
+          dest: routinTableItem.dest
         });
       }
     });
@@ -366,12 +367,31 @@ export class Router {
   }
 
   /**
-   * @description 根据neighbors来更新neighborsDVs
+   * @description 当 neighbors 出现更新，根据 neighbors 来更新 neighborsDVs
    * @private
    * @param {Neighbors} neighbors
    */
   private DVUpdateNeighborsDVsWithNeighbors(neighbors: Neighbors): void {
-
+    // Delete DV of routers that are not neighbors any more
+    this.neighborsDVs.forEach((value, key, map) => {
+      if (neighbors.get(key) === undefined) {
+        this.neighborsDVs.delete(key);
+      }
+    });
+    // Add DV of new neighbors
+    neighbors.forEach((neighbor, neighborPort) => {
+      if (this.neighborsDVs.get(neighborPort) === undefined) {
+        // 如果发现A是本节点的邻居，但neighborsDVs中没有A的DV，那么为A初始化一个DV
+        // 初始化的DV必须包括A到A自己的DVItem（cost为0），这样在DV算法中才能得到从本节点到A的路由
+        const newDV: DV = new Map();
+        newDV.set(neighborPort, {
+          cost: 0,
+          dest: neighborPort
+        });
+        this.neighborsDVs.set(neighborPort, newDV);
+      }
+    });
+    // Update route table because neighborsDV change
     this.respondToNeighborsDVsChange(neighbors, this.neighborsDVs);
   }
 
@@ -379,14 +399,19 @@ export class Router {
    * @description 根据接收到的dv通告来更新neighborsDVs
    * @private
    */
-  private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dv: DV): void {
-
+  private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dv: DVItem[]): void {
+    if (!this.neighbors.has(origin)) { throw new Error(`${this.logHead} 从不是邻居的节点收到DV`); }
+    const newDV: DV = new Map();
+    dv.forEach(item => {
+      newDV.set(item.dest, { dest: item.dest, cost: item.cost });
+    });
+    this.neighborsDVs.set(origin, newDV);
     this.respondToNeighborsDVsChange(this.neighbors, this.neighborsDVs);
   }
 
   private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
     if (this.algorithm !== RoutingAlgorithm.dv) {
-      throw new Error("方法调用错了！");
+      throw new Error(`${this.logHead} Calling respondToNeighborsDVsChange() when the mode is not 'dv'!`);
     }
     const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
     if (this.DVhasChanged(this.routeTable, newRouteTable)) {
@@ -403,7 +428,23 @@ export class Router {
    * @param {RouteTable} newRouteTable
    */
   private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
-
+    if (oldRouteTable.size !== newRouteTable.size) {
+      console.log(`${this.logHead} The new route table has changed!`);
+      return true;
+    } else {
+      oldRouteTable.forEach((val, key) => {
+        const newEntry = newRouteTable.get(key);
+        if (newEntry === undefined) {
+          console.log(`${this.logHead} The new route table has changed!`);
+          return true;
+        } else if (newEntry.cost !== val.cost || newEntry.nextHop !== val.nextHop) {
+          console.log(`${this.logHead} The new route table has changed!`);
+          return true;
+        }
+      });
+    }
+    console.log(`${this.logHead} The new route table is the same with the old.`);
+    return false;
   }
 
   /**
@@ -413,7 +454,23 @@ export class Router {
    * @param {Map<number, DV>} neighborsDVs
    */
   private DVComputeRouteTable(neighbors: Neighbors, neighborsDVs: Map<number, DV>): RouteTable {
-
+    if (neighbors.size !== neighborsDVs.size) {
+      throw new Error(`${this.logHead} neighbors.size != neighborsDVs.size!`);
+    }
+    const newRouteTable: RouteTable = new Map();
+    neighborsDVs.forEach((dv, neighbor) => {
+      const neighborInfo = neighbors.get(neighbor);
+      if (neighborInfo === undefined) {
+        throw new Error(`${this.logHead} neighbor found in neighborsDVs is not found in neighbors!`);
+      }
+      dv.forEach((item, dest) => {
+        const rtItem = newRouteTable.get(dest);
+        if (rtItem === undefined || rtItem.cost > neighborInfo.cost + item.cost) {
+          newRouteTable.set(dest, { dest: dest, cost: neighborInfo.cost + item.cost, nextHop: neighbor });
+        }
+      });
+    });
+    return newRouteTable;
   }
 
   // -----------------------------ls------------------------------------
