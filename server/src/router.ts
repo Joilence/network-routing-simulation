@@ -60,6 +60,7 @@ export class Router {
    * @description 路由表。用来转发数据包。
    * 它是ls或dv的计算结果，不要直接修改routeTable，而是修改数据来源（也就是neighbors）
    * 道理类似于：我们不应该直接修改编译器的输出代码，而应该去修改编译器的输入代码，从而输出会相应地改变
+   * TODO: 确保路由表中有去往自己的条目，否则在dv计算中会出问题，而且在LSUpdateAdjacencyListWithRouteTable中也会误删自己的邻居表
    */
   private routeTable: RouteTable;
 
@@ -248,6 +249,7 @@ export class Router {
   private respondToNeighborsChange(neighbors: Neighbors) {
     if (this.algorithm === RoutingAlgorithm.ls) {
       this.LSUpdateAdjacencyListWithNeighbors(this.neighbors);
+      this.LSBroadcastLinkState(neighbors);
     }
     else if (this.algorithm === RoutingAlgorithm.dv) {
       this.DVUpdateNeighborsDVsWithNeighbors(this.neighbors);
@@ -314,7 +316,7 @@ export class Router {
       this.neighbors.forEach((neighbor) => {
         this.sendPacket(neighbor.dest, packet);
       });
-      this.LSUpdateAdjacencyListWithReceivedLS(packet.src, packet.data);
+      this.LSUpdateAdjacencyListWithReceivedLS(packet.src, (<Packet<LSLinkState>> packet).data);
     } else if (packet.protocol === RoutingAlgorithm.dv) {
       this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, packet.data);
     } else if (packet.protocol === 'data') {
@@ -417,11 +419,12 @@ export class Router {
   // -----------------------------ls------------------------------------
   /**
    * @description 将LSLinkState广播到网络中的所有主机
+   * TODO: 还是需要加上定时广播，否则在一些情况会出问题。
    */
   private LSBroadcastLinkState(neighbors: Neighbors) {
     // neighbors被转化为数组以后才能被序列化
     const neighborsArray: Neighbor[] = [];
-    this.neighbors.forEach(neighbor => {
+    neighbors.forEach(neighbor => {
       neighborsArray.push(neighbor);
     });
     const linkState: LSLinkState = {
@@ -432,7 +435,7 @@ export class Router {
     if (this.NextLSSequenceNumber > 4096) {
       this.NextLSSequenceNumber = 0;
     }
-    this.neighbors.forEach(neighbor => {
+    neighbors.forEach(neighbor => {
       this.sendPacket(neighbor.dest, {
         src: this.port,
         dest: neighbor.dest,
@@ -461,27 +464,40 @@ export class Router {
 
   /**
    * @description 根据neighbors来更新AdjacencyList。
-   * 算法：
-   * 1. 检查自己的邻居链表，删掉没出现在neighbors中的节点。
-   * 2. 检查其他每个节点i的邻居链表，如果i不在neighbors中，则它的邻居链表中不能有本节点（如果有，则删掉）；
-   * 如果i在neighbors中，则它的邻居链表中必须有本节点（如果没有，则加上）。
    * @private
    * @param {Neighbors} neighbors
    */
   private LSUpdateAdjacencyListWithNeighbors(neighbors: Neighbors) {
+    // 将自己的邻居表直接替换成neighbors
+    this.adjacencyList.set(this.port, neighbors);
 
+    neighbors.forEach(neighbor => {
+      const neighborsOfOtherNode = this.adjacencyList.get(neighbor.dest);
+      // 修改每个邻居的邻居表，让它包括本节点
+      if (neighborsOfOtherNode === undefined) {
+        this.adjacencyList.set(neighbor.dest, new Map([[this.port, { dest: this.port, cost: neighbor.cost }]]));
+      } else {
+        neighborsOfOtherNode.set(this.port, { dest: this.port, cost: neighbor.cost });
+      }
+    });
     this.respondToAdjacencyListChange(neighbors, this.adjacencyList);
   }
 
   /**
    * @description 根据最新计算出的路由表来更新AdjacencyList。
    * 算法：
-   * 对于不在路由表中的节点，说明它们已经不可达，应该删除它们对应的邻居链表
+   * 对于不在路由表中的节点，说明它们已经不可达，应该删除它们对应的邻居表
    * @private
    * @param {RouteTable} routeTable
    */
   private LSUpdateAdjacencyListWithRouteTable(routeTable: RouteTable) {
-
+    if (!routeTable.has(this.port)) { throw new Error("请确保路由表中包含到达自己的条目"); }
+    this.adjacencyList.forEach((neighborsOfNode, nodePort) => {
+      if (!routeTable.has(nodePort)) {
+        this.adjacencyList.delete(nodePort);
+      }
+    });
+    // 在这里不需要调用respondToAdjacencyListChange，因为删除的都是没有用的邻居表
   }
 
   /**
@@ -491,31 +507,39 @@ export class Router {
    * 如果origin的邻居链表不在AdjacencyList中，向AdjacencyList增加广播中的邻居链表。
    * @private
    */
-  private LSUpdateAdjacencyListWithReceivedLS(origin: number, neighbors: Neighbors) {
-    // TODO: 如果接收到的ls与邻接链表中的相同，则不触发更新
+  private LSUpdateAdjacencyListWithReceivedLS(origin: number, linkState: LSLinkState) {
+    // 将linkState转化为Neighbors
+    const newNeighborsOfNode: Neighbors = new Map();
+    linkState.neighbors.forEach((neighbor) => {
+      newNeighborsOfNode.set(neighbor.dest, neighbor);
+    });
+    // 设置origin的邻居表
+    this.adjacencyList.set(origin, newNeighborsOfNode);
 
+    this.respondToAdjacencyListChange(this.neighbors, this.adjacencyList);
   }
 
   private respondToAdjacencyListChange(neighbors: Neighbors, adjacencyList: Map<number, Neighbors>) {
     if (this.algorithm !== RoutingAlgorithm.ls) {
       throw new Error("方法调用错了！");
     }
-    const newRouteTable = this.LSRunDijkstra(adjacencyList); // TODO: 更新runDijkstra
+    const newRouteTable = this.LSRunDijkstra(adjacencyList);
     this.routeTable = newRouteTable;
     // 从AdjacencyList中删除那些已经无法到达的节点
     this.LSUpdateAdjacencyListWithRouteTable(newRouteTable);
-    this.LSBroadcastLinkState(neighbors);
   }
 
   private LSRunDijkstra(adjacencyList: Map<number, Neighbors>): RouteTable {
-    // 初始化currentDist
-    const currentDist: Map<number, { cost: number, hasExpanded: boolean, nextHop: number }> = new Map();
+    const resultRouteTable: RouteTable = new Map();
+    // 初始化currentDist，currentDist用来存储Dijkstra算法需要的信息
+    interface CurrentDistItem { cost: number; hasExpanded: boolean; nextHop: number; }
+    const currentDist: Map<number, CurrentDistItem> = new Map();  // 以port为key
     this.adjacencyList.forEach((neighbors, port) => {
-      // currentDist的字段，它存储了Dijkstra算法需要的信息
+      // 将网络中所有节点加入currentDist
       currentDist.set(port, {
         cost: Number.MAX_SAFE_INTEGER + 1,
         hasExpanded: false,
-        nextHop: -1 // 下一跳的路由
+        nextHop: -1 // 要去往port的下一跳路由
       });
     });
     const originDistInfo = currentDist.get(this.port);
@@ -526,8 +550,8 @@ export class Router {
     originDistInfo.nextHop = this.port;
 
     // 不断扩展节点，更新currentDist
-    for (let i = 0; i < this.adjacencyList.size; i++) {
-      // 找到下一个要扩展的节点（也就是尚未扩展，但是距离原点距离最短的那个节点）
+    for (let i = 0; i < currentDist.size; i++) {
+      // 找到下一个要扩展的节点（尚未扩展，但是距离原点距离最短的那个节点）
       let expandingRouter = -1;
       let minCost = -1;
       currentDist.forEach((distInfo, port) => {
@@ -539,41 +563,38 @@ export class Router {
           minCost = distInfo.cost;
         }
       });
-      if (expandingRouter === -1 || minCost === -1) { throw new Error('没有找到可扩展的节点，网络不连通'); }
+      if (expandingRouter === -1 || minCost === -1) {
+        // 路由算法找不到可以扩展的节点，提前结束
+        break;
+      }
 
-      // 扩展expandingRouter
-      const expandingDistInfo = currentDist.get(expandingRouter);
-      if (expandingDistInfo === undefined) { throw new Error("currentDist中没有expandingRouter"); }
-      expandingDistInfo.hasExpanded = true;
+      // 开始扩展expandingRouter
+      const expandingRouterDistInfo = currentDist.get(expandingRouter) as CurrentDistItem;
+      expandingRouterDistInfo.hasExpanded = true;
 
-      const neighbors = this.adjacencyList.get(expandingRouter) as Neighbors;
-      neighbors.forEach((neighbor) => {
-        const neighborDistInfo = currentDist.get(neighbor.dest);
-        if (neighborDistInfo === undefined) { throw new Error("currentDist中没有expandingRouter的neighbor"); }
-        if (neighborDistInfo.cost > expandingDistInfo.cost + neighbor.cost) {
-          // neighbor与原点的距离 > expandingRouter与原点的距离 + expandingRouter与neighbor的距离
-          neighborDistInfo.cost = expandingDistInfo.cost + neighbor.cost;
-          neighborDistInfo.nextHop = expandingDistInfo.nextHop;
+      // 将被选择扩展的节点加入路由表中
+      resultRouteTable.set(expandingRouter,
+        { dest: expandingRouter, cost: minCost, nextHop: expandingRouterDistInfo.nextHop });
+
+      // expandingRouter的邻居表
+      const expandingRouterNeighbors = this.adjacencyList.get(expandingRouter) as Neighbors;
+      // 更新expandingRouter的所有邻居的neighborDistInfo
+      expandingRouterNeighbors.forEach((expandingRouterNeighbor) => {
+        const neighbors = this.adjacencyList.get(expandingRouterNeighbor.dest);
+        if (neighbors === undefined || !neighbors.has(expandingRouter)) {
+          // 检查expandingRouterNeighbor的邻居表中有没有expandingRouter
+          // 如果没有，则无视这个expandingRouterNeighbor
+          return;
+        }
+
+        const neighborDistInfo = currentDist.get(expandingRouterNeighbor.dest) as CurrentDistItem;
+        // neighbor与原点的距离 > expandingRouter与原点的距离 + expandingRouter与expandingRouterNeighbor的距离
+        if (neighborDistInfo.cost > expandingRouterDistInfo.cost + expandingRouterNeighbor.cost) {
+          neighborDistInfo.cost = expandingRouterDistInfo.cost + expandingRouterNeighbor.cost;
+          neighborDistInfo.nextHop = expandingRouterDistInfo.nextHop;
         }
       });
     }
-
-    // 使用currentDist更新路由表
-    // TODO: 哪些路由表项的timestamp需要更新
-    currentDist.forEach((distInfo, port) => {
-      const originalRouteItem = this.routeTable.get(port);
-      if (originalRouteItem === undefined ||
-        originalRouteItem.cost !== distInfo.cost ||
-        originalRouteItem.nextHop !== distInfo.nextHop) {
-        // 如果路由表还没有去往该目标路由器的条目，或条目的cost与计算结果不同，或条目的nextHop与计算结果不同
-        // 更新该表项
-        this.routeTable.set(port, {
-          dest: port,
-          cost: distInfo.cost,
-          nextHop: distInfo.nextHop
-        });
-      }
-    });
-
+    return resultRouteTable;
   }
 }
