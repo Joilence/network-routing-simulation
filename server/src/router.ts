@@ -45,7 +45,7 @@ export class Router {
    * @description 邻接链表。仅在算法为ls时使用。
    * 使用邻接链表运行Dijkstra算法之前要将adjacencyList规范化：
    * 消除单向路径、
-   * 将Map转化成Array，将每个邻居用它在数组中的下标来表示，从而能Dijkstra算法能更快地找到对应邻居（用下标访问取代Map.get()）
+   * 将Map转化成Array，将每个邻居用它在数组中的下标来表示，从而能Dijkstra算法能更快地找到对应邻居（用下标访问取代Map.get()）。
    * Dijkstra算法的输出只包括从本节点可达的节点，利用这一点，将adjacencyList中已经不可达的节点删除
    */
   private adjacencyList: Map<number, Neighbors>;
@@ -73,12 +73,19 @@ export class Router {
   private stopListening: null | (() => void) = null;
 
   /**
-   * @description 每台ls路由器，需要维护下次广播的序列号
+   * @description 每台ls路由器，需要维护下次要广播的序列号
    * 如果路由器多次收到来自同一台路由器且序号相同的广播，则不作出任何反应，防止广播风暴
    * 否则，接受这个路由广播，更新adjacencyList，并向所有邻居转发这个广播
    * 详见 https://en.wikipedia.org/wiki/Link-state_routing_protocol 中的sequence number
    */
-  private sequenceNumber = 0;
+  private NextLSSequenceNumber = 0;
+  /**
+   * @description 对于其他的每个节点，记录上次收到来自它的LS广播的序列号
+   * 如果路由器多次收到来自同一台路由器且序号相同的广播，则不作出任何反应，防止广播风暴
+   * @private
+   * @type {Map<number, number>}
+   */
+  private receivedLSSequenceNumber: Map<number, number>;
 
   /**
    * @description algorithm === 'centralized'时使用，标记本节点是不是中心路由
@@ -102,7 +109,8 @@ export class Router {
     this.algorithm = algorithm;
     this.adjacencyList = new Map();
     this.routeTable = new Map();
-    this.sequenceNumber = 0;
+    this.NextLSSequenceNumber = 0;
+    this.receivedLSSequenceNumber = new Map();
     this.isCenter = !!isCenter;
     this.centerPort = Number(centerPort);
   }
@@ -167,6 +175,7 @@ export class Router {
    * 改变网络拓扑不是router自己能够做到的，应该由RouterController来做。
    */
   private clearNetworkInfoStorage() {
+    this.receivedLSSequenceNumber.clear();
     this.adjacencyList.clear();
     this.neighborsDVs.clear();
     this.routeTable.clear();
@@ -301,14 +310,12 @@ export class Router {
     if (this.neighbors.get(remoteInfo.port) === undefined) {
       throw new Error("从一个不是邻居的节点收到数据包");
     }
-    if (packet.protocol === RoutingAlgorithm.ls) {
-      // TODO: handle single-direction connection state information
-      // when a router shutdown after it sends LS state
-      // and its neighbors send LS state then
-      // handle this single-direction connection in the first LS state
-
-      // TODO: 广播数据包。为了防止洪泛，要在这里丢弃接收过的数据包而不响应
-
+    if (packet.protocol === RoutingAlgorithm.ls && this.isNewLS(packet)) {
+      // 没接收过的LS广播
+      this.receivedLSSequenceNumber.set(packet.src, (<Packet<LSLinkState>> packet).data.sequenceNumber);
+      this.neighbors.forEach((neighbor) => {
+        this.sendPacket(neighbor.dest, packet);
+      });
       this.LSUpdateAdjacencyListWithReceivedLS(packet.src, packet.data);
     } else if (packet.protocol === RoutingAlgorithm.dv) {
       this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, (<Packet<DVItem[]>> packet).data);
@@ -483,11 +490,14 @@ export class Router {
     this.neighbors.forEach(neighbor => {
       neighborsArray.push(neighbor);
     });
-
     const linkState: LSLinkState = {
       neighbors: neighborsArray,
-      sequenceNumber: this.sequenceNumber++
+      sequenceNumber: this.NextLSSequenceNumber++
     };
+    // 防止NextLSSequenceNumber变得过大
+    if (this.NextLSSequenceNumber > 4096) {
+      this.NextLSSequenceNumber = 0;
+    }
     this.neighbors.forEach(neighbor => {
       this.sendPacket(neighbor.dest, {
         src: this.port,
@@ -496,6 +506,23 @@ export class Router {
         data: linkState
       });
     });
+  }
+
+  /**
+   * @description 用于判断接收到的LS广播是不是已经接收过
+   * @private
+   * @param {Packet<LSLinkState>} packet
+   * @returns
+   */
+  private isNewLS(packet: Packet<LSLinkState>) {
+    const lastSequenceNumber = this.receivedLSSequenceNumber.get(packet.src);
+    const receivedSequenceNumber = (<Packet<LSLinkState>> packet).data.sequenceNumber;
+    if (lastSequenceNumber === undefined  // 第一次收到这个节点发的LS
+      || receivedSequenceNumber > lastSequenceNumber  // 接收到的LS更加新
+      || lastSequenceNumber - receivedSequenceNumber > 1024
+      // receivedSequenceNumber突然比lastSequenceNumber小很多
+      // 说明发送者的sequenceNumber超过4096回到0了
+    ) { return true; } else { return false; }
   }
 
   /**
@@ -534,14 +561,6 @@ export class Router {
     // TODO: 如果接收到的ls与邻接链表中的相同，则不触发更新
 
   }
-
-  /*
-  private LSUpdateRouteTable(packet: Packet<LSLinkState>, remoteInfo: dgram.AddressInfo) {
-    // 更新adjacencyList
-    this.adjacencyList.set(packet.data.origin, packet.data.neighbors);
-    this.runDijkstra();
-  }
-  */
 
   private respondToAdjacencyListChange(neighbors: Neighbors, adjacencyList: Map<number, Neighbors>) {
     if (this.algorithm !== RoutingAlgorithm.ls) {
