@@ -1,0 +1,35 @@
+<p>nodes number: {{networkService.nodes.length}}</p>
+<p>edges number: {{networkService.edges.length}}</p>
+<div [ngSwitch]="mode">
+  <p class="showJSON" *ngSwitchCase="0">{{showString}}</p>
+  <p class="showJSON" *ngSwitchCase="1">{{showString}}</p>
+  <div *ngSwitchCase="2">
+    <h2>please input router info: </h2>
+    <div>id(port):
+      <input type="number" [(ngModel)]="nodeId">
+    </div>
+    <div>label:
+      <input type="text" [(ngModel)]="nodeLabel">
+    </div>
+    <div>
+      <button (click)="confirmInput();">OK!</button>
+    </div>
+  </div>
+  <div *ngSwitchCase="3">
+    <h2>please input link info: </h2>
+    <div>from id:
+      <input type="number" [(ngModel)]="fromId">
+    </div>
+    <div>to id:
+      <input type="number" [(ngModel)]="toId">
+    </div>
+    <div>link cost:
+      <input type="number" [(ngModel)]="linkCost">
+    </div>
+    <div>
+      <button (click)="confirmInput();">OK!</button>
+    </div>
+  </div>
+  <!-- mode为undefined时什么都不显示 -->
+  <div *ngSwitchDefault></div>
+</div>

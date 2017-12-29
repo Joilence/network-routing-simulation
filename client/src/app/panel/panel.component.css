@@ -1,0 +1,12 @@
+:host {
+  position: fixed;
+  right: 10px;
+  top: 10px;
+  width: 450px;
+  display: block;
+  border: 1px solid black;
+}
+
+.showJSON {
+  white-space: pre
+}
