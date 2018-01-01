@@ -1,8 +1,8 @@
 <p>nodes number: {{networkService.nodes.length}}</p>
 <p>edges number: {{networkService.edges.length}}</p>
 <div [ngSwitch]="mode">
-  <p class="showJSON" *ngSwitchCase="0">{{showString}}</p>
-  <p class="showJSON" *ngSwitchCase="1">{{showString}}</p>
+  <p class="showJSON" *ngSwitchCase="0">{{showObject|myJsonPipe}}</p>
+  <p class="showJSON" *ngSwitchCase="1">{{showObject|myJsonPipe}}</p>
   <div *ngSwitchCase="2">
     <h2>please input router info: </h2>
     <div>id(port):

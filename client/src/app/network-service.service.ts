@@ -2,7 +2,12 @@ import { Injectable, ElementRef } from '@angular/core';
 import * as vis from 'vis';
 
 import { PanelComponent } from "./panel/panel.component";
+import { BackendService } from './backend.service';
+import { Command } from '../../../types';
 
+// https://github.com/almende/vis/blob/master/examples/network/events/interactionEvents.html
+// http://visjs.org/docs/network/manipulation.html
+// http://visjs.org/examples/network/events/interactionEvents.html
 @Injectable()
 export class NetworkService {
 
@@ -12,27 +17,24 @@ export class NetworkService {
 
   // create an array with nodes
   // http://visjs.org/docs/network/nodes.html
-  readonly nodes = new vis.DataSet([
-    { id: 1, label: 'Router 1' },
-    { id: 2, label: 'Router 2' },
-    { id: 3, label: 'Router 3' },
-    { id: 4, label: 'Router 4' },
-    { id: 5, label: 'Router 5' }
-  ]);
+  readonly nodes = new vis.DataSet<{}>();
 
   // create an array with edges
   // http://visjs.org/docs/network/edges.html
-  readonly edges = new vis.DataSet([
-    { from: 1, to: 3 },
-    { from: 1, to: 2 },
-    { from: 2, to: 4 },
-    { from: 2, to: 5 }
-  ]);
+  readonly edges = new vis.DataSet<{ to: number, from: number, linkCost: number }>();
 
   panel: PanelComponent;
 
-  constructor() {
-
+  constructor(private backendService: BackendService) {
+    backendService.message.subscribe(message => {
+      switch (message.command) {
+        case Command.fetchNodeInfo:
+          if (this.panel.showObject.id === message.data.routerId) {
+            this.panel.showObject.routerInfo = message.data;
+          }
+        break;
+      }
+    });
   }
 
   createNetwork(containerElement: ElementRef, panel: PanelComponent) {
@@ -55,6 +57,17 @@ export class NetworkService {
       });
       // Remove the found edges
       data.edges.remove(edges);
+    });
+    data.nodes.on('add', (event, info) => {
+      info.items.forEach((id) => {
+        this.backendService.addNode(id);
+      });
+    });
+    data.edges.on('add', (event, info) => {
+      info.items.forEach((id: number) => {
+        const edge = data.edges.get(id);
+        this.backendService.addEdge(edge.from, edge.to, edge.linkCost);
+      });
     });
     const options = {
       // http://visjs.org/docs/network/interaction.html
@@ -81,20 +94,21 @@ export class NetworkService {
     };
     const network = new vis.Network(container, data, options);
     network.on("selectNode", (params) => {
-      console.log('selectNode Event:', params);
+      // console.log('selectNode Event:', params);
       const node = this.nodes.get(params.nodes[0]);
       this.panel.showNode(node);
+      this.backendService.fetchNodeInfo(params.nodes[0]);
     });
     network.on("selectEdge", (params) => {
-      console.log('selectEdge Event:', params);
+      // console.log('selectEdge Event:', params);
       const edge = this.edges.get(params.edges[0]);
       this.panel.showEdge(edge);
     });
     network.on("deselectNode", (params) => {
-      console.log('deselectNode Event:', params);
+      // console.log('deselectNode Event:', params);
     });
     network.on("deselectEdge", (params) => {
-      console.log('deselectEdge Event:', params);
+      // console.log('deselectEdge Event:', params);
     });
   }
 

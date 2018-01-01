@@ -1,14 +1,12 @@
 import { Component, OnInit } from '@angular/core';
 
-import { NetworkService } from '../network-service.service';
-
 enum PanelMode {
   showNode,
   showEdge,
   editNode,
   editEdge
 }
-
+import { NetworkService } from '../network-service.service';
 @Component({
   selector: 'app-panel',
   templateUrl: './panel.component.html',
@@ -27,11 +25,7 @@ export class PanelComponent implements OnInit {
   get mode() {
     return this._mode;
   }
-  showString: string;
-  set showObject(obj: Object) {
-    this.showString = JSON.stringify(obj, null, 4);
-    console.log(this.showString);
-  }
+  public showObject;
 
   constructor(private networkService: NetworkService) { }
 

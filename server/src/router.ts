@@ -16,7 +16,9 @@ export class Router {
   /**
    * @description 路由器监听通告的端口，我们用此整数作为路由器的标识符
    */
-  private port: number;
+  public port: number;
+
+  private UDPSocket: dgram.Socket;
 
   /**
    * @description 路由器的名称
@@ -33,12 +35,12 @@ export class Router {
    * 算法为dv时，在计算自己dv的时候需要用到它
    * 当修改网络拓扑时，修改它，网络拓扑的变化信息就能扩散到整个网络
    */
-  private neighbors: Neighbors;
+  private neighbors: Neighbors = new Map();
 
   /**
    * @description 路由算法：RoutingAlgorithm.ls | dv | centralized
    */
-  private algorithm: RoutingAlgorithm;
+  private algorithm: RoutingAlgorithm = RoutingAlgorithm.ls;
 
   /**
    * @description 邻接链表。仅在算法为ls时使用。
@@ -47,14 +49,14 @@ export class Router {
    * 将Map转化成Array，将每个邻居用它在数组中的下标来表示，从而能Dijkstra算法能更快地找到对应邻居（用下标访问取代Map.get()）。
    * Dijkstra算法的输出只包括从本节点可达的节点，利用这一点，将adjacencyList中已经不可达的节点删除
    */
-  private adjacencyList: Map<number, Neighbors>;
+  private adjacencyList: Map<number, Neighbors> = new Map();
 
   /**
    * @description 存储邻居的DV。仅在算法为dv时使用。
    * @private
    * @type {Map<number, DV>}
    */
-  private neighborsDVs: Map<number, DV>;
+  private neighborsDVs: Map<number, DV> = new Map();
 
   /**
    * @description 路由表。用来转发数据包。
@@ -62,12 +64,12 @@ export class Router {
    * 道理类似于：我们不应该直接修改编译器的输出代码，而应该去修改编译器的输入代码，从而输出会相应地改变
    * TODO: 确保路由表中有去往自己的条目，否则在dv计算中会出问题，而且在LSUpdateAdjacencyListWithRouteTable中也会误删自己的邻居表
    */
-  private routeTable: RouteTable;
+  private routeTable: RouteTable = new Map();
 
   /**
    * @description Router State
    */
-  private state: RouterState;
+  private state: RouterState = RouterState.off;
 
   // 在关闭路由器的时候要调用stopListening()，释放套接字
   private stopListening: null | (() => void) = null;
@@ -85,32 +87,26 @@ export class Router {
    * @private
    * @type {Map<number, number>}
    */
-  private receivedLSSequenceNumber: Map<number, number>;
+  private receivedLSSequenceNumber: Map<number, number> = new Map();
 
   /**
    * @description algorithm === 'centralized'时使用，标记本节点是不是中心路由
    */
-  private isCenter: boolean;
+  private isCenter: boolean = false;
 
   /**
    * @description algorithm === 'centralized'时使用，记录中心节点的地址
    */
-  private centerPort: number;
+  private centerPort: number = -1;
 
   constructor(port: number,
     // name: string,
-    neighbors: Neighbors = new Map(),
     algorithm: RoutingAlgorithm = RoutingAlgorithm.ls,
     isCenter?: boolean,
     centerPort?: number) {
     this.port = port;
     // this.name = name;
-    this.neighbors = neighbors;
     this.algorithm = algorithm;
-    this.adjacencyList = new Map();
-    this.routeTable = new Map();
-    this.NextLSSequenceNumber = 0;
-    this.receivedLSSequenceNumber = new Map();
     this.isCenter = !!isCenter;
     this.centerPort = Number(centerPort);
   }
@@ -119,16 +115,43 @@ export class Router {
    * @description 获取本路由器的汇总信息，方便交给UI显示
    * @readonly
    */
-  get routerInfo() {
+  public getRouterInfo() {
+    // 将Map转化为可JSON化的对象
+    const stringifiableNeighbors: any = {};
+    this.neighbors.forEach((neighbor, port) => {
+      stringifiableNeighbors[port] = neighbor;
+    });
+
+    const stringifiableAdjacencyList: any = {};
+    this.adjacencyList.forEach((neighbors, originPort) => {
+      const neighborsObj: any = stringifiableAdjacencyList[originPort] = {};
+      neighbors.forEach((neighbor, neighborPort) => {
+        neighborsObj[neighborPort] = neighbor;
+      });
+    });
+
+    const stringifiableNeighborsDVs: any = {};
+    this.neighborsDVs.forEach((dv, neighborPort) => {
+      const DVObj: any = stringifiableNeighborsDVs[neighborPort] = {};
+      dv.forEach((dvItem, dest) => {
+        DVObj[dest] = dvItem;
+      });
+    });
+
+    const stringifiableRouteTable: any = {};
+    this.routeTable.forEach((routeTableItem, dest) => {
+      stringifiableRouteTable[dest] = routeTableItem;
+    });
+
     return {
+      port: this.port,
       // name: this.name,
       algorithm: this.algorithm,
-      neighbors: this.neighbors,
-      port: this.port,
+      neighbors: stringifiableNeighbors,
       state: this.state,
-
-      adjacencyList: Array.from(this.adjacencyList),  // 转化为可JSON化的对象
-      routeTable: Array.from(this.routeTable)         // 转化为可JSON化的对象
+      adjacencyList: stringifiableAdjacencyList,
+      neighborsDVs: stringifiableNeighborsDVs,
+      routeTable: stringifiableRouteTable
     };
   }
 
@@ -189,7 +212,7 @@ export class Router {
    */
   public connect(port: number, cost: number) {
     const neighborAlready = this.neighbors.get(port);
-    if (neighborAlready === undefined) {
+    if (neighborAlready !== undefined) {
       console.warn(`${this.logHead} 路由器${port}已经是邻居，connect操作取消`);
       return;
     }
@@ -259,7 +282,9 @@ export class Router {
 
   // -----------------------------IO------------------------------------
   private sendPacket(dest: number, packet: Packet<any>) {
-    console.log(`${this.logHead} sending ${packet} to ${dest}`);
+    if (this.state !== RouterState.on) {
+      throw new Error("can't sendPacket when router is not on");
+    }
     // Query route table
     const entry = this.routeTable.get(dest);
     let outPort = -1;
@@ -270,40 +295,38 @@ export class Router {
       return;
     }
     // Get out port number and send packet
-    const socket = dgram.createSocket('udp4');
-    socket.send(JSON.stringify(packet), outPort, '127.0.0.1', (err) => {
+    this.UDPSocket.send(JSON.stringify(packet), outPort, '127.0.0.1', (err) => {
       if (err) {
         console.error(`${this.logHead} fail to send packet to ${outPort}`, err);
       } else {
         console.log(`${this.logHead} has sent ${packet.protocol} packet to ${outPort}`);
       }
-      socket.close();
     });
   }
 
   private startListening() {
-    if (this.stopListening != null) {
+    if (this.stopListening != null || this.state !== RouterState.off) {
       throw new Error(`${this.logHead} you shouldn't startListening before closing last socket`);
     }
-    const server = dgram.createSocket('udp4');
-    server.on('listening', () => {
-      const address = server.address();
+    this.UDPSocket = dgram.createSocket('udp4');
+    this.UDPSocket.on('listening', () => {
+      const address = this.UDPSocket.address();
       console.log(`${this.logHead} now is listening on ${address.address}:${address.port}`);
     });
-    server.on('error', (err) => {
-      server.close();
-      throw new Error(`服务器异常：\n${err.stack}`);
+    this.UDPSocket.on('error', (err) => {
+      this.UDPSocket.close();
+      throw new Error(`服务器异常：\n${err}`);
     });
-    server.on('message', (msg, remoteInfo) => {
+    this.UDPSocket.on('message', (msg, remoteInfo) => {
       const packet = <Packet<any>> JSON.parse(msg.toString());
       console.log(`${this.logHead} Get ${packet.protocol} packet from ${remoteInfo.address}:${remoteInfo.port},
       src is ${packet.src}`);
       this.packetHandler(packet, remoteInfo);
     });
-    server.bind(this.port);
+    this.UDPSocket.bind(this.port, "127.0.0.1");
     // 在关闭路由器的时候要调用stopListening()，释放套接字
     this.stopListening = () => {
-      server.close();
+      this.UDPSocket.close();
     };
   }
 
@@ -315,7 +338,9 @@ export class Router {
       // 没接收过的LS广播
       this.receivedLSSequenceNumber.set(packet.src, (<Packet<LSLinkState>> packet).data.sequenceNumber);
       this.neighbors.forEach((neighbor) => {
-        this.sendPacket(neighbor.dest, packet);
+        if (remoteInfo.port !== neighbor.dest) {
+          this.sendPacket(neighbor.dest, packet);
+        }
       });
       this.LSUpdateAdjacencyListWithReceivedLS(packet.src, (<Packet<LSLinkState>> packet).data);
     } else if (packet.protocol === RoutingAlgorithm.dv) {
@@ -547,6 +572,7 @@ export class Router {
    * @private
    * @param {RouteTable} routeTable
    */
+  /*
   private LSUpdateAdjacencyListWithRouteTable(routeTable: RouteTable) {
     if (!routeTable.has(this.port)) { throw new Error("请确保路由表中包含到达自己的条目"); }
     this.adjacencyList.forEach((neighborsOfNode, nodePort) => {
@@ -556,6 +582,7 @@ export class Router {
     });
     // 在这里不需要调用respondToAdjacencyListChange，因为删除的都是没有用的邻居表
   }
+  */
 
   /**
    * @description 根据接收到的LS广播来更新AdjacencyList。
@@ -582,8 +609,10 @@ export class Router {
     }
     const newRouteTable = this.LSRunDijkstra(adjacencyList);
     this.routeTable = newRouteTable;
+    /*
     // 从AdjacencyList中删除那些已经无法到达的节点
     this.LSUpdateAdjacencyListWithRouteTable(newRouteTable);
+    */
   }
 
   private LSRunDijkstra(adjacencyList: Map<number, Neighbors>): RouteTable {
@@ -610,7 +639,7 @@ export class Router {
     for (let i = 0; i < currentDist.size; i++) {
       // 找到下一个要扩展的节点（尚未扩展，但是距离原点距离最短的那个节点）
       let expandingRouter = -1;
-      let minCost = -1;
+      let minCost = Number.MAX_SAFE_INTEGER;
       currentDist.forEach((distInfo, port) => {
         if (distInfo.cost !== Number.MAX_SAFE_INTEGER &&
           Number.isSafeInteger(distInfo.cost) &&
@@ -648,7 +677,10 @@ export class Router {
         // neighbor与原点的距离 > expandingRouter与原点的距离 + expandingRouter与expandingRouterNeighbor的距离
         if (neighborDistInfo.cost > expandingRouterDistInfo.cost + expandingRouterNeighbor.cost) {
           neighborDistInfo.cost = expandingRouterDistInfo.cost + expandingRouterNeighbor.cost;
-          neighborDistInfo.nextHop = expandingRouterDistInfo.nextHop;
+          // 去往expandingRouterNeighbor的nextHop与去往expandingRouter的nextHop是一样的
+          // 除非expandingRouter是本节点、expandingRouterNeighbor是邻居节点，此时nextHop直接就是邻居节点的port
+          neighborDistInfo.nextHop = (expandingRouterDistInfo.nextHop === this.port) ?
+            expandingRouterNeighbor.dest : expandingRouterDistInfo.nextHop;
         }
       });
     }
