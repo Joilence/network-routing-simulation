@@ -78,6 +78,11 @@ export class Router {
    */
   private receivedLSSequenceNumber: Map<number, number> = new Map();
 
+  private timerIds: { LSBroadcast: any; neighborsMonitoring: any; } = {
+    LSBroadcast: undefined,
+    neighborsMonitoring: null
+  };
+
   /**
    * @description algorithm === 'centralized'时使用，标记本节点是不是中心路由
    */
@@ -156,6 +161,7 @@ export class Router {
     this.clearNetworkInfoStorage();
     // 清空网络状态存储以后，要调用这个方法来更新adjacencyList或neighborsDVs
     this.respondToNeighborsChange(this.neighbors);
+    this.startTimer();
   }
 
   /**
@@ -173,6 +179,7 @@ export class Router {
     this.state = RouterState.off;
     // 不清空neighbors，以便在开启的时候，RouterController能够用它恢复原来的连线
     this.clearNetworkInfoStorage();
+    this.stopTimer();
   }
 
   /**
@@ -184,6 +191,19 @@ export class Router {
       throw new Error(`${this.logHead} has already been shutdown or fail`);
     }
     this.state = RouterState.fault;
+    this.stopTimer();
+  }
+
+  /**
+   * @description 将路由器从出错状态恢复到正常状态
+   * @memberof Router
+   */
+  public recover() {
+    if (this.state !== RouterState.fault || this.UDPSocket == null) {
+      throw new Error(`${this.logHead} recover()只在RouterState.fault时可以调用`);
+    }
+    this.state = RouterState.on;
+    this.startTimer();
   }
 
   /**
@@ -358,6 +378,21 @@ export class Router {
       }
       // TODO: 中心路由算法
       // this.CenterUpdateRouteTable()
+    }
+  }
+
+  private startTimer() {
+    if (this.algorithm === RoutingAlgorithm.ls) {
+      this.timerIds.LSBroadcast = setInterval(() => {
+        this.LSBroadcastLinkState(this.neighbors);
+      }, 20 * 1000);
+    }
+  }
+
+  private stopTimer() {
+    if (this.timerIds.LSBroadcast) {
+      clearInterval(this.timerIds.LSBroadcast);
+      this.timerIds.LSBroadcast = null;
     }
   }
 
