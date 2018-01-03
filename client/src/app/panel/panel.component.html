@@ -5,11 +5,8 @@
   <p class="showJSON" *ngSwitchCase="1">{{showObject|myJsonPipe}}</p>
   <div *ngSwitchCase="2">
     <h2>please input router info: </h2>
-    <div>id(port):
+    <div>id:
       <input type="number" [(ngModel)]="nodeId">
-    </div>
-    <div>label:
-      <input type="text" [(ngModel)]="nodeLabel">
     </div>
     <div>
       <button (click)="confirmInput();">OK!</button>

@@ -42,12 +42,10 @@ export class PanelComponent implements OnInit {
     this.showObject = edge;
   }
 
-  nodeLabel: string;
   nodeId: number;
   confirmInput: Function;
   editNode(nodeData, callback) {
     this.mode = PanelMode.editNode;
-    this.nodeLabel = nodeData.label;
     this.nodeId = nodeData.id;
     this.confirmInput = (cancel = false) => {
       if (cancel) {
@@ -55,7 +53,7 @@ export class PanelComponent implements OnInit {
         this.confirmInput = null;
         return;
       }
-      nodeData.label = this.nodeLabel;
+      nodeData.label = '' + this.nodeId;
       nodeData.id = this.nodeId;
       try {
         callback(nodeData);

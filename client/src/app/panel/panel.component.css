@@ -1,9 +1,8 @@
 :host {
-  position: absolute;
-  right: 10px;
-  top: 10px;
-  width: 450px;
-  display: block;
+  width: 30%;
+  display: inline-block;
+  margin-top: 5px;
+  vertical-align: top;
   border: 1px solid black;
 }
 

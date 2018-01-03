@@ -23,6 +23,8 @@ export class BackendService {
     });
     this.socket.addEventListener('error', (event) => {
       console.log('WebSocket error', event);
+      alert("socket发生错误，点击确定刷新页面");
+      location.reload();
     });
     this.socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
@@ -31,6 +33,8 @@ export class BackendService {
     });
     this.socket.addEventListener('close', (event) => {
       console.log('WebSocket close', event);
+      alert("socket断开，点击确定刷新页面");
+      location.reload();
     });
   }
 
