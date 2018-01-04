@@ -12,23 +12,14 @@ export class RouterController {
   private nextAvailablePort = 9011;
   /**
    * @description 创建一个新的路由器实例
-   * @param {number} routerId
    * @returns 是否成功
    * @memberof RouterController
    */
-  public createRouter(routerId: number) {
-    if (this.IdToRouter.has(routerId) === true) {
-      throw new Error('id已经存在！');
-    }
+  public createRouter() {
     const newRouter = new Router(this.nextAvailablePort++);
-    try {
-      newRouter.run();
-    } catch (err) {
-      console.error(`run路由器时失败, id: ${routerId}, port: ${this.nextAvailablePort - 1}`, err);
-      return false;
-    }
-    this.IdToRouter.set(routerId, newRouter);
-    return true;
+    newRouter.run();
+    this.IdToRouter.set(newRouter.port, newRouter);
+    return newRouter.port;
   }
 
   public createLink(routerId1: number, routerId2: number, linkCost: number) {
@@ -52,5 +43,49 @@ export class RouterController {
 
   public clearRouters() {
     this.IdToRouter.clear();
+  }
+
+  public shutdownRouter(routerId: number) {
+    const router = this.IdToRouter.get(routerId);
+    if (router === undefined) { throw new Error(`${routerId}不存在`); }
+    router.shutdown();
+    router.getNeighbors().forEach(neighbor => {
+      const neighborRouter = this.IdToRouter.get(neighbor.dest);
+      if (neighborRouter === undefined) { throw new Error(`${neighbor.dest}不存在`); }
+      // 从邻居路由器中删除被shutdown的路由器
+      neighborRouter.disconnect(router.port);
+    });
+  }
+
+  public turnOnRouter(routerId: number) {
+    const router = this.IdToRouter.get(routerId);
+    if (router === undefined) { throw new Error(`${routerId}不存在`); }
+    router.getNeighbors().forEach((neighbor) => {
+      const neighborRouter = this.IdToRouter.get(neighbor.dest);
+      if (neighborRouter === undefined) { throw new Error(`邻居${routerId}不存在`); }
+      neighborRouter.connect(router.port, neighbor.cost);
+    });
+    router.run();
+  }
+
+  public changeLinkCost(routerId1: number, routerId2: number, linkCost: number) {
+    const router1 = this.IdToRouter.get(routerId1);
+    const router2 = this.IdToRouter.get(routerId2);
+    if (router1 === undefined || router2 === undefined) { throw new Error(`${routerId1}或${routerId2}不存在`); }
+    router1.changeLinkCost(routerId2, linkCost);
+    router2.changeLinkCost(routerId1, linkCost);
+  }
+
+  public deleteRouter(routerId: number) {
+    this.shutdownRouter(routerId);
+    this.IdToRouter.delete(routerId);
+  }
+
+  public deleteEdge(routerId1: number, routerId2: number) {
+    const router1 = this.IdToRouter.get(routerId1);
+    const router2 = this.IdToRouter.get(routerId2);
+    if (router1 === undefined || router2 === undefined) { throw new Error(`${routerId1}或${routerId2}不存在`); }
+    router1.disconnect(routerId2);
+    router2.disconnect(routerId1);
   }
 }

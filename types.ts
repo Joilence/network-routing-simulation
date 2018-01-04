@@ -1,7 +1,12 @@
 export enum Command {
   createRouter,
   createLink,
-  fetchNodeInfo
+  fetchNodeInfo,
+  shutdownRouter,
+  changeLinkCost,
+  turnOnRouter,
+  deleteRouter,
+  deleteEdge
 }
 
 export interface ClientSend<T> {
@@ -14,21 +19,12 @@ export interface ServerSend<T> {
   data: T;
 }
 
-export interface CreateRouterParam {
+export interface NodeParam {
   routerId: number;
 }
 
-export interface CreateLinkParam {
+export interface LinkParam {
   routerId1: number;
   routerId2: number;
   linkCost: number;
 }
-
-export interface FetchNodeInfoParam {
-  routerId: number;
-}
-
-export interface NodeInfo {
-
-}
-

@@ -1,8 +1,18 @@
 <p>nodes number: {{networkService.nodes.length}}</p>
 <p>edges number: {{networkService.edges.length}}</p>
 <div [ngSwitch]="mode">
-  <p class="showJSON" *ngSwitchCase="0">{{showObject|myJsonPipe}}</p>
-  <p class="showJSON" *ngSwitchCase="1">{{showObject|myJsonPipe}}</p>
+  <div *ngSwitchCase="0">
+    <p class="showJSON">{{showObject|myJsonPipe}}</p>
+    <button *ngIf="!showObject.shutdown" (click)="networkService.shutdownRouter(showObject.id);">关闭路由器</button>
+    <button *ngIf="showObject.shutdown" (click)="networkService.turnOnRouter(showObject.id)">重新打开路由器</button>
+  </div>
+  <div *ngSwitchCase="1">
+    <p class="showJSON">{{showObject|myJsonPipe}}</p>
+    <div>修改链路开销：
+      <input type="number" [(ngModel)]="linkCost">
+      <button (click)="changeLinkCost(showObject.from, showObject.to, linkCost)">修改</button>
+    </div>
+  </div>
   <div *ngSwitchCase="2">
     <h2>please input router info: </h2>
     <div>id:
@@ -14,12 +24,6 @@
   </div>
   <div *ngSwitchCase="3">
     <h2>please input link info: </h2>
-    <div>from id:
-      <input type="number" [(ngModel)]="fromId">
-    </div>
-    <div>to id:
-      <input type="number" [(ngModel)]="toId">
-    </div>
     <div>link cost:
       <input type="number" [(ngModel)]="linkCost">
     </div>

@@ -37,43 +37,16 @@ export class PanelComponent implements OnInit {
     this.showObject = node;
   }
 
-  showEdge(edge: Object) {
+  showEdge(edge: any) {
     this.mode = PanelMode.showEdge;
     this.showObject = edge;
+    this.linkCost = edge.linkCost;
   }
 
-  nodeId: number;
-  confirmInput: Function;
-  editNode(nodeData, callback) {
-    this.mode = PanelMode.editNode;
-    this.nodeId = nodeData.id;
-    this.confirmInput = (cancel = false) => {
-      if (cancel) {
-        callback(null);
-        this.confirmInput = null;
-        return;
-      }
-      nodeData.label = '' + this.nodeId;
-      nodeData.id = this.nodeId;
-      try {
-        callback(nodeData);
-      } catch (error) {
-        alert("ID重复！");
-        return;
-      }
-      this.confirmInput = null;
-      this.mode = null;
-    };
-  }
-
-  fromId: number;
-  toId: number;
   linkCost: number;
-  editEdge(edgeData, callback) {
-    console.log(edgeData);
+  confirmInput: Function;
+  createEdge(edgeData, callback) {
     this.mode = PanelMode.editEdge;
-    this.fromId = edgeData.from.id ? edgeData.from.id : edgeData.from;
-    this.toId = edgeData.to.id ? edgeData.to.id : edgeData.to;
     this.linkCost = 10;
     this.confirmInput = (cancel = false) => {
       if (cancel) {
@@ -81,17 +54,16 @@ export class PanelComponent implements OnInit {
         this.confirmInput = null;
         return;
       }
-      edgeData.from = this.fromId;
-      edgeData.to = this.toId;
+      console.log(edgeData);
       edgeData.linkCost = this.linkCost;
-      try {
-        callback(edgeData);
-      } catch (error) {
-        alert("edge修改失败");
-        return;
-      }
+      callback(edgeData);
       this.confirmInput = null;
       this.mode = null;
     };
+  }
+
+  changeLinkCost(routerId1: number, routerId2: number, linkCost: number) {
+    this.networkService.changeLinkCost(routerId1, routerId2, linkCost);
+    this.mode = null;
   }
 }

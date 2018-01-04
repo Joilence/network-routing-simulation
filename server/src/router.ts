@@ -30,6 +30,13 @@ export class Router {
    * 当修改网络拓扑时，修改它，网络拓扑的变化信息就能扩散到整个网络
    */
   private neighbors: Neighbors = new Map();
+  public getNeighbors() {
+    const res: Neighbor[] = [];
+    this.neighbors.forEach((neighbor) => {
+      res.push({ ...neighbor });
+    });
+    return res;
+  }
 
   /**
    * @description 路由算法：RoutingAlgorithm.ls | dv | centralized
@@ -239,6 +246,18 @@ export class Router {
   }
 
   /**
+   * @description 只会修改本路由器中的信息
+   * @param {number} neighbor
+   * @param {number} LinkCost
+   */
+  public changeLinkCost(neighborPort: number, LinkCost: number) {
+    const neighbor = this.neighbors.get(neighborPort);
+    if (neighbor === undefined) { throw new Error(`${this.logHead} changeLinkCost传入的参数不是邻居`); }
+    neighbor.cost = LinkCost;
+    this.respondToNeighborsChange(this.neighbors);
+  }
+
+  /**
    * @description 切换路由算法。
    * 在其他路由器为ls算法的情况下，将一个路由器配置为dv算法没有什么意义
    * 应该由RouterController同时修改所有路由器的算法
@@ -309,7 +328,7 @@ export class Router {
     if (entry !== undefined) {
       outPort = entry.nextHop;
     } else {
-      console.error(`${this.logHead} unknown router ${dest}`);
+      console.error(`${this.logHead} sendPacket unknown router ${dest}`);
       return;
     }
     // Get out port number and send packet
