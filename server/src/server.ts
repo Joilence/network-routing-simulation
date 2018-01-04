@@ -36,11 +36,11 @@ wss.on('connection', (ws: WebSocket) => {
 
         break;
       case Command.createLink:
-        const param = (receivedObject as ClientSend<LinkParam>).parameters;
-        if (routerController.createLink(param.routerId1, param.routerId2, param.linkCost)) {
-          const res2: ServerSend<null> = { command: Command.createLink, isSuccess: true, data: null };
-          ws.send(JSON.stringify(res2));
-        }
+        ({ routerId1, routerId2, linkCost } = (receivedObject as ClientSend<LinkParam>).parameters);
+        routerController.createLink(routerId1, routerId2, linkCost);
+        const res2: ServerSend<LinkParam> =
+          { command: Command.createLink, isSuccess: true, data: { routerId1, routerId2, linkCost } };
+        ws.send(JSON.stringify(res2));
         break;
       case Command.fetchNodeInfo:
         routerId = (receivedObject as ClientSend<NodeParam>).parameters.routerId;
@@ -76,11 +76,11 @@ wss.on('connection', (ws: WebSocket) => {
         const res7: ServerSend<NodeParam> = { command: Command.deleteRouter, isSuccess: true, data: { routerId } };
         ws.send(JSON.stringify(res7));
         break;
-      case Command.deleteEdge:
+      case Command.deleteLink:
         ({ routerId1, routerId2 } = (receivedObject as ClientSend<LinkParam>).parameters);
         routerController.deleteEdge(routerId1, routerId2);
         const res8: ServerSend<LinkParam> =
-          { command: Command.deleteEdge, isSuccess: true, data: { routerId1, routerId2, linkCost: -1 } };
+          { command: Command.deleteLink, isSuccess: true, data: { routerId1, routerId2, linkCost: -1 } };
         ws.send(JSON.stringify(res8));
         break;
     }

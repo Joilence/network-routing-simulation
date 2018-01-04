@@ -9,6 +9,7 @@ import {
 
 import { Observable } from 'rxjs/Observable';
 import { Subject } from 'rxjs/Subject';
+import 'rxjs/add/operator/take';
 
 @Injectable()
 export class BackendService {
@@ -20,19 +21,32 @@ export class BackendService {
   private _createdNode: Subject<ServerSend<NodeParam>> = new Subject();
   public createdNode = this._createdNode.asObservable();
 
-  private _deletedRouter: Subject<ServerSend<NodeParam>> = new Subject();
-  public deletedRouter = this._deletedRouter.asObservable();
+  private _deletedNode: Subject<ServerSend<NodeParam>> = new Subject();
+  public deletedNode = this._deletedNode.asObservable();
+
+  private _createdEdge: Subject<ServerSend<LinkParam>> = new Subject();
+  public createdEdge = this._createdEdge.asObservable();
 
   private _deletedEdge: Subject<ServerSend<LinkParam>> = new Subject();
   public deletedEdge = this._deletedEdge.asObservable();
 
+  private _socketReady: Subject<null> = new Subject();
+  public socketReady = this._socketReady.take(1);
+
   constructor() {
     this.socket.addEventListener('open', (event) => {
       console.log('WebSocket open', event);
+      this._socketReady.next(null);
+      this._socketReady.complete();
     });
     this.socket.addEventListener('error', (event) => {
       console.log('WebSocket error', event);
       alert("socket发生错误，点击确定刷新页面");
+      location.reload();
+    });
+    this.socket.addEventListener('close', (event) => {
+      console.log('WebSocket close', event);
+      alert("socket断开，点击确定刷新页面");
       location.reload();
     });
     this.socket.addEventListener('message', (event) => {
@@ -46,17 +60,15 @@ export class BackendService {
           this._createdNode.next(message);
           break;
         case Command.deleteRouter:
-          this._deletedRouter.next(message);
+          this._deletedNode.next(message);
           break;
-        case Command.deleteEdge:
+        case Command.createLink:
+          this._createdEdge.next(message);
+          break;
+        case Command.deleteLink:
           this._deletedEdge.next(message);
           break;
       }
-    });
-    this.socket.addEventListener('close', (event) => {
-      console.log('WebSocket close', event);
-      alert("socket断开，点击确定刷新页面");
-      location.reload();
     });
   }
 
@@ -122,7 +134,7 @@ export class BackendService {
 
   deleteEdge(routerId1: number, routerId2: number) {
     const sendObj: ClientSend<LinkParam> = {
-      command: Command.deleteEdge,
+      command: Command.deleteLink,
       parameters: {
         routerId1, routerId2, linkCost: -1
       }

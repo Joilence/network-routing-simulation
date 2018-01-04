@@ -26,13 +26,10 @@ export class RouterController {
     const router1 = this.IdToRouter.get(routerId1);
     const router2 = this.IdToRouter.get(routerId2);
     if (router1 === undefined || router2 === undefined) {
-      console.error(`routerId1：${routerId1}或routerId2：${routerId2}不存在`);
-      return false;
+      throw new Error(`routerId1：${routerId1}或routerId2：${routerId2}不存在`);
     }
-
     router1.connect(router2.port, linkCost);
     router2.connect(router1.port, linkCost);
-    return true;
   }
 
   public getRouterInfo(routerId: number) {

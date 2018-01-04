@@ -2,6 +2,7 @@ import { Injectable, ElementRef } from '@angular/core';
 import * as vis from 'vis';
 import 'rxjs/add/operator/first';
 import 'rxjs/add/operator/zip';
+import 'rxjs/add/operator/bufferCount';
 import { Subject } from 'rxjs/Subject';
 
 import { PanelComponent } from "./panel/panel.component";
@@ -48,8 +49,13 @@ export class NetworkService {
         this.nodes.add(node);
       });
 
-    backendService.deletedRouter.subscribe(message => {
+    backendService.deletedNode.subscribe(message => {
       this.nodes.remove(message.data.routerId);
+    });
+
+    backendService.createdEdge.subscribe(message => {
+      const { routerId1, routerId2, linkCost } = message.data;
+      this.edges.add({ from: routerId1, to: routerId2, linkCost });
     });
 
     backendService.deletedEdge.subscribe(message => {
@@ -61,8 +67,24 @@ export class NetworkService {
         }
       });
       if (edgesIds.length !== 1) { throw new Error(`${routerId1}-${routerId1}之间的边不存在或者存在多条`); }
-      console.log(edgesIds);
       this.edges.remove(edgesIds[0]);
+    });
+
+    // 删除节点的时候顺带删除相连的边
+    this.nodes.on('remove', (event, info) => {
+      const deleted_ids = info.items;
+      // Find the edges which connect these nodes
+      const edges = this.edges.getIds({
+        filter: (item) => {
+          return (deleted_ids.indexOf(item.to) !== -1) ||
+            (deleted_ids.indexOf(item.from) !== -1);
+        }
+      });
+      // Remove the found edges
+      this.edges.remove(edges);
+    });
+    backendService.socketReady.subscribe(() => {
+      this.createInitView();
     });
   }
 
@@ -74,26 +96,7 @@ export class NetworkService {
       nodes: this.nodes,
       edges: this.edges
     };
-    // 删除节点的时候顺带删除相连的边
-    data.nodes.on('remove', (event, info) => {
-      const deleted_ids = info.items;
-      // Find the edges which connect these nodes
-      const edges = data.edges.getIds({
-        filter: (item) => {
-          return (deleted_ids.indexOf(item.to) !== -1) ||
-            (deleted_ids.indexOf(item.from) !== -1);
-        }
-      });
-      // Remove the found edges
-      data.edges.remove(edges);
-    });
 
-    data.edges.on('add', (event, info) => {
-      info.items.forEach((id: number) => {
-        const edge = data.edges.get(id);
-        this.backendService.addEdge(edge.from, edge.to, edge.linkCost);
-      });
-    });
     const options = {
       // http://visjs.org/docs/network/interaction.html
       interaction: {
@@ -106,7 +109,6 @@ export class NetworkService {
         initiallyActive: true,
         addNode: (nodeData, callback) => {
           this.backendService.addNode();
-          console.log(nodeData);
           this.nodesWaitingToBeCreated.next({ x: nodeData.x, y: nodeData.y });
           callback(null);
         },
@@ -127,7 +129,20 @@ export class NetworkService {
             callback(null);
             return;
           }
-          this.panel.createEdge(edgeData, callback);
+          const linkCostStr = prompt(`请输入${edgeData.from}--${edgeData.to}链路的开销：`, '10');
+          if (linkCostStr == null || linkCostStr === '') {
+            callback(null);
+            return;
+          }
+          const linkCost = Number(linkCostStr);
+          if (!Number.isInteger(linkCost) || linkCost <= 0) {
+            alert('输入不合法，操作取消');
+            callback(null);
+            return;
+          }
+          edgeData.linkCost = linkCost;
+          this.backendService.addEdge(edgeData.from, edgeData.to, edgeData.linkCost);
+          callback(null);
         },
         editEdge: false,
         deleteNode: (nodeData, callback) => {
@@ -137,6 +152,7 @@ export class NetworkService {
         deleteEdge: (edgeData, callback) => {
           const edge: any = this.edges.get(edgeData.edges[0]);
           this.backendService.deleteEdge(edge.from, edge.to);
+          callback(null);
         }
       }
     };
@@ -200,5 +216,21 @@ export class NetworkService {
     edges[0].linkCost = linkCost;
     this.edges.update(edges[0]);
     this.backendService.changeLinkCost(routerId1, routerId2, linkCost);
+  }
+
+  private createInitView() {
+    this.backendService.addNode();
+    this.backendService.addNode();
+    this.backendService.addNode();
+    this.nodesWaitingToBeCreated.next({ x: 0, y: 0 });
+    this.nodesWaitingToBeCreated.next({ x: 20, y: 20 });
+    this.nodesWaitingToBeCreated.next({ x: 40, y: 40 });
+    this.backendService.createdNode.bufferCount(3).take(1).subscribe(([m1, m2, m3]) => {
+      const nodeId1 = m1.data.routerId;
+      const nodeId2 = m2.data.routerId;
+      const nodeId3 = m3.data.routerId;
+      this.backendService.addEdge(nodeId1, nodeId2, 30);
+      this.backendService.addEdge(nodeId2, nodeId3, 50);
+    });
   }
 }

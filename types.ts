@@ -6,7 +6,7 @@ export enum Command {
   changeLinkCost,
   turnOnRouter,
   deleteRouter,
-  deleteEdge
+  deleteLink
 }
 
 export interface ClientSend<T> {
