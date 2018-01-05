@@ -536,17 +536,17 @@ export class Router {
     if (oldRouteTable.size !== newRouteTable.size) {
       return true;
     } else {
+      let hasChange = false;
       oldRouteTable.forEach((val, key) => {
         const newEntry = newRouteTable.get(key);
         if (newEntry === undefined) {
-          return true;
+          hasChange = true;
         } else if (newEntry.cost !== val.cost || newEntry.nextHop !== val.nextHop) {
-          return true;
+          hasChange = true;
         }
       });
+      return hasChange;
     }
-    // console.log(`${this.logHead} The new route table is the same with the old.`);
-    return false;
   }
 
   /**

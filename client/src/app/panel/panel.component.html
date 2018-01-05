@@ -3,12 +3,12 @@
 <hr *ngIf="mode!=null" />
 <div [ngSwitch]="mode">
   <div *ngSwitchCase="0">
-    <t-json-viewer [json]="showObject" [maxCollapsedLength]="40"></t-json-viewer>
+    <t-json-viewer [json]="showObject" [maxCollapsedLength]="40" [expandAll]="true"></t-json-viewer>
     <button *ngIf="!showObject.shutdown" (click)="networkService.shutdownRouter(showObject.id);">关闭路由器</button>
     <button *ngIf="showObject.shutdown" (click)="networkService.turnOnRouter(showObject.id)">重新打开路由器</button>
   </div>
   <div *ngSwitchCase="1">
-    <t-json-viewer [json]="showObject" [maxCollapsedLength]="40"></t-json-viewer>
+    <t-json-viewer [json]="showObject" [maxCollapsedLength]="40" [expandAll]="true"></t-json-viewer>
     <div>修改链路开销：
       <input type="number" [(ngModel)]="linkCost">
       <button (click)="changeLinkCost(showObject.from, showObject.to, linkCost)">修改</button>
