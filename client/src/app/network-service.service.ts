@@ -70,6 +70,10 @@ export class NetworkService {
       this.edges.remove(edgesIds[0]);
     });
 
+    backendService.logs.subscribe(message => {
+      console.log(message.data);
+    });
+
     // 删除节点的时候顺带删除相连的边
     this.nodes.on('remove', (event, info) => {
       const deleted_ids = info.items;
@@ -98,6 +102,13 @@ export class NetworkService {
     };
 
     const options = {
+      physics: {
+        barnesHut: {
+          springConstant: 0.01,
+          damping: 1
+        },
+        minVelocity: 0.75
+      },
       // http://visjs.org/docs/network/interaction.html
       interaction: {
         hover: true,

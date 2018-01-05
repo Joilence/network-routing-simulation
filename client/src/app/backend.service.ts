@@ -4,7 +4,8 @@ import {
   ServerSend,
   ClientSend,
   NodeParam,
-  LinkParam
+  LinkParam,
+  Log,
 } from '../../../types';
 
 import { Observable } from 'rxjs/Observable';
@@ -30,6 +31,9 @@ export class BackendService {
   private _deletedEdge: Subject<ServerSend<LinkParam>> = new Subject();
   public deletedEdge = this._deletedEdge.asObservable();
 
+  private _logs: Subject<ServerSend<Log>> = new Subject();
+  public logs = this._logs.asObservable();
+
   private _socketReady: Subject<null> = new Subject();
   public socketReady = this._socketReady.take(1);
 
@@ -51,7 +55,7 @@ export class BackendService {
     });
     this.socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
-      console.log('WebSocket message', message);
+      // console.log('WebSocket message', message);
       switch (message.command) {
         case Command.fetchNodeInfo:
           this._nodeInfo.next(message);
@@ -67,6 +71,9 @@ export class BackendService {
           break;
         case Command.deleteLink:
           this._deletedEdge.next(message);
+          break;
+        case Command.log:
+          this._logs.next(message);
           break;
       }
     });

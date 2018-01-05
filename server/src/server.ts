@@ -16,6 +16,13 @@ let nextAvailablePort = 9011;
 
 wss.on('connection', (ws: WebSocket) => {
   console.log('have connection');
+  // // 在原始send方法上增加console.log，方便在服务器后台查看信息
+  // const originalSend = ws.send.bind(ws);
+  // ws.send = (sendObj: any) => {
+  //   console.log("服务器返回指令", sendObj);
+  //   originalSend(sendObj);
+  // };
+
   const routerController = new RouterController();
   const logSubscription = routerController.logs.subscribe(log => {
     const sendObj: ServerSend<Log> = {
@@ -28,7 +35,7 @@ wss.on('connection', (ws: WebSocket) => {
   // connection is up, let's add a simple simple event
   ws.on('message', (message: string) => {
     const receivedObject: ClientSend<any> = JSON.parse(message);
-    console.log("接收到消息", receivedObject);
+    console.log("服务端接收到指令:\n", receivedObject);
     let routerId: number;
     let routerId1: number;
     let routerId2: number;

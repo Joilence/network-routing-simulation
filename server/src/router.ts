@@ -195,7 +195,8 @@ export class Router {
    */
   public shutdown() {
     if (this.state !== RouterState.on || this.UDPSocket == null) {
-      throw new Error(`${this.logHead} has already been shutdown or fail`);
+      console.warn(`${this.logHead} has already been shutdown or fail`);
+      return;
     }
     this.UDPSocket.close();
     this.UDPSocket = undefined;
@@ -357,7 +358,7 @@ export class Router {
       if (err) {
         console.error(`${this.logHead} fail to send packet to ${outPort}`, err);
       } else {
-        console.log(`${this.logHead} has sent ${packet.protocol} packet to ${outPort}`);
+        // console.log(`${this.logHead} has sent ${packet.protocol} packet to ${outPort}`);
       }
     });
   }
@@ -377,8 +378,8 @@ export class Router {
     });
     this.UDPSocket.on('message', (msg, remoteInfo) => {
       const packet = <Packet<any>> JSON.parse(msg.toString());
-      console.log(`${this.logHead} Get ${packet.protocol} packet from ${remoteInfo.address}:${remoteInfo.port},
-      src is ${packet.src}`);
+      // console.log(`${this.logHead} Get ${packet.protocol} packet from ${remoteInfo.address}:${remoteInfo.port},
+      // src is ${packet.src}`);
       this.packetHandler(packet, remoteInfo);
     });
     this.UDPSocket.bind(this.port, "127.0.0.1");
