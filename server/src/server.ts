@@ -8,14 +8,23 @@ import {
   ClientSend,
   NodeParam,
   LinkParam,
+  Log,
 } from '../../types';
 
 const wss = new WebSocket.Server({ port: 8999 });
-const routerController = new RouterController();
+let nextAvailablePort = 9011;
 
 wss.on('connection', (ws: WebSocket) => {
   console.log('have connection');
-  routerController.clearRouters();
+  const routerController = new RouterController();
+  const logSubscription = routerController.logs.subscribe(log => {
+    const sendObj: ServerSend<Log> = {
+      command: Command.log,
+      isSuccess: true,
+      data: log
+    };
+    ws.send(JSON.stringify(sendObj));
+  });
   // connection is up, let's add a simple simple event
   ws.on('message', (message: string) => {
     const receivedObject: ClientSend<any> = JSON.parse(message);
@@ -26,7 +35,7 @@ wss.on('connection', (ws: WebSocket) => {
     let linkCost: number;
     switch (receivedObject.command) {
       case Command.createRouter:
-        routerId = routerController.createRouter();
+        routerId = routerController.createRouter(nextAvailablePort++);
         const res1: ServerSend<NodeParam> = {
           command: Command.createRouter,
           isSuccess: true,
@@ -88,14 +97,13 @@ wss.on('connection', (ws: WebSocket) => {
 
   ws.on("error", (err) => {
     console.error("连接中断", err);
+    ws.close();
   });
 
   ws.on("close", (code: number, reason: string) => {
     console.error("连接关闭", code, reason);
-  });
-
-  ws.on("open", () => {
-    console.error("连接打开");
+    logSubscription.unsubscribe();
+    routerController.clearRouters();
   });
 
 });

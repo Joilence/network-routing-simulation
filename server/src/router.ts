@@ -100,11 +100,15 @@ export class Router {
    */
   private centerPort: number = -1;
 
+  private pushLog: (msg: string, json?: any) => void;
+
   constructor(port: number,
+    logFunc: (msg: string, json?: any) => void,
     algorithm: RoutingAlgorithm = RoutingAlgorithm.ls,
     isCenter?: boolean,
     centerPort?: number) {
     this.port = port;
+    this.pushLog = logFunc;
     this.algorithm = algorithm;
     this.isCenter = !!isCenter;
     this.centerPort = Number(centerPort);
@@ -115,42 +119,53 @@ export class Router {
    * @readonly
    */
   public getRouterInfo() {
-    // 将Map转化为可JSON化的对象
-    const stringifiableNeighbors: any = {};
-    this.neighbors.forEach((neighbor, port) => {
-      stringifiableNeighbors[port] = neighbor;
-    });
+    return {
+      port: this.port,
+      algorithm: this.algorithm,
+      neighbors: this.stringifiableNeighbors(this.neighbors),
+      state: this.state,
+      adjacencyList: this.stringifiableAdjacencyList(this.adjacencyList),
+      neighborsDVs: this.stringifiableNeighborsDVs(this.neighborsDVs),
+      routeTable: this.stringifiableRouteTable(this.routeTable)
+    };
+  }
 
-    const stringifiableAdjacencyList: any = {};
-    this.adjacencyList.forEach((neighbors, originPort) => {
-      const neighborsObj: any = stringifiableAdjacencyList[originPort] = {};
+  public stringifiableNeighbors(neighbors: Neighbors) {
+    const res: any = {};
+    neighbors.forEach((neighbor, port) => {
+      res[port] = neighbor;
+    });
+    return res;
+  }
+
+  public stringifiableAdjacencyList(adjacencyList: Map<number, Neighbors>) {
+    const res: any = {};
+    adjacencyList.forEach((neighbors, originPort) => {
+      const neighborsObj: any = res[originPort] = {};
       neighbors.forEach((neighbor, neighborPort) => {
         neighborsObj[neighborPort] = neighbor;
       });
     });
+    return res;
+  }
 
-    const stringifiableNeighborsDVs: any = {};
-    this.neighborsDVs.forEach((dv, neighborPort) => {
-      const DVObj: any = stringifiableNeighborsDVs[neighborPort] = {};
+  public stringifiableNeighborsDVs(neighborsDVs: Map<number, DV>) {
+    const res: any = {};
+    neighborsDVs.forEach((dv, neighborPort) => {
+      const DVObj: any = res[neighborPort] = {};
       dv.forEach((dvItem, dest) => {
         DVObj[dest] = dvItem;
       });
     });
+    return res;
+  }
 
-    const stringifiableRouteTable: any = {};
-    this.routeTable.forEach((routeTableItem, dest) => {
-      stringifiableRouteTable[dest] = routeTableItem;
+  public stringifiableRouteTable(routeTable: RouteTable) {
+    const res: any = {};
+    routeTable.forEach((routeTableItem, dest) => {
+      res[dest] = routeTableItem;
     });
-
-    return {
-      port: this.port,
-      algorithm: this.algorithm,
-      neighbors: stringifiableNeighbors,
-      state: this.state,
-      adjacencyList: stringifiableAdjacencyList,
-      neighborsDVs: stringifiableNeighborsDVs,
-      routeTable: stringifiableRouteTable
-    };
+    return res;
   }
 
   get logHead() {
@@ -164,6 +179,7 @@ export class Router {
     }
     this.startListening();
     this.state = RouterState.on;
+    this.pushLog(`start running`);
     // 清空所有有关网络状态的信息，不包括neighbors
     this.clearNetworkInfoStorage();
     // 清空网络状态存储以后，要调用这个方法来更新adjacencyList或neighborsDVs
@@ -186,6 +202,7 @@ export class Router {
     this.state = RouterState.off;
     // 不清空neighbors，以便在开启的时候，RouterController能够用它恢复原来的连线
     this.clearNetworkInfoStorage();
+    this.pushLog(`shutdown`);
     this.stopTimer();
   }
 
@@ -199,6 +216,7 @@ export class Router {
     }
     this.state = RouterState.fault;
     this.stopTimer();
+    this.pushLog(`router break down`);
   }
 
   /**
@@ -210,6 +228,7 @@ export class Router {
       throw new Error(`${this.logHead} recover()只在RouterState.fault时可以调用`);
     }
     this.state = RouterState.on;
+    this.pushLog(`router recover`);
     this.startTimer();
   }
 
@@ -227,8 +246,8 @@ export class Router {
     }
     // Add into neighbors
     this.neighbors.set(port, { cost: cost, dest: port });
+    this.pushLog(`connect with ${port}`);
     this.respondToNeighborsChange(this.neighbors);
-    console.log(`${this.logHead} connect with ${port}`);
   }
 
   /**
@@ -241,8 +260,8 @@ export class Router {
       console.warn(`${this.logHead} 路由器${port}不是邻居，disconnect操作无效`);
       return;
     }
+    this.pushLog(`disconnect with ${port}`);
     this.respondToNeighborsChange(this.neighbors);
-    console.log(`${this.logHead} disconnect with ${port}`);
   }
 
   /**
@@ -253,6 +272,7 @@ export class Router {
   public changeLinkCost(neighborPort: number, LinkCost: number) {
     const neighbor = this.neighbors.get(neighborPort);
     if (neighbor === undefined) { throw new Error(`${this.logHead} changeLinkCost传入的参数不是邻居`); }
+    this.pushLog(`changing link cost with ${neighborPort}: from ${neighbor.cost} to ${LinkCost}`);
     neighbor.cost = LinkCost;
     this.respondToNeighborsChange(this.neighbors);
   }
@@ -276,6 +296,7 @@ export class Router {
   */
 
   public sendMessage(dest: number, msg: string) {
+    this.pushLog(`sending message "${msg}" to ${dest}`);
     this.sendPacket(dest, {
       src: this.port,
       dest: dest,
@@ -328,7 +349,7 @@ export class Router {
     if (entry !== undefined) {
       outPort = entry.nextHop;
     } else {
-      console.error(`${this.logHead} sendPacket unknown router ${dest}`);
+      console.warn(`${this.logHead} sendPacket unknown router ${dest}`);
       return;
     }
     // Get out port number and send packet
@@ -348,7 +369,7 @@ export class Router {
     this.UDPSocket = dgram.createSocket('udp4');
     this.UDPSocket.on('listening', () => {
       const address = (this.UDPSocket as dgram.Socket).address();
-      console.log(`${this.logHead} now is listening on ${address.address}:${address.port}`);
+      this.pushLog(`start listening on port ${address.port}`);
     });
     this.UDPSocket.on('error', (err) => {
       (this.UDPSocket as dgram.Socket).close();
@@ -385,9 +406,14 @@ export class Router {
       this.DVUpdateNeighborsDVsWithReceivedDV(packet.src, (<Packet<DVItem[]>> packet).data);
     } else if (packet.protocol === 'data') {
       if (packet.dest === this.port) { // pkt to me
-        console.log(`${this.logHead} receive message ${packet.data}`);
-        // TODO: store received message
+        this.pushLog(`receive message for me: ${packet.data}`);
       } else { // pkt to forward
+        const entry = this.routeTable.get(packet.dest);
+        if (entry !== undefined) {
+          this.pushLog(`forward packet to ${entry.nextHop}`, packet);
+        } else {
+          this.pushLog(`don't know where to forward the packet!`, packet);
+        }
         this.sendPacket(packet.dest, packet);
       }
     }
@@ -492,7 +518,7 @@ export class Router {
       throw new Error(`${this.logHead} Calling respondToNeighborsDVsChange() when the mode is not 'dv'!`);
     }
     const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
-    if (this.DVhasChanged(this.routeTable, newRouteTable)) {
+    if (this.routeTablehasChanged(this.routeTable, newRouteTable)) {
       // 如果新的路由表与之前的路由表相比有发生变化，才发送DV通告
       this.routeTable = newRouteTable;
       this.DVInformNeighbors(newRouteTable);
@@ -505,18 +531,15 @@ export class Router {
    * @param {RouteTable} oldRouteTable
    * @param {RouteTable} newRouteTable
    */
-  private DVhasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
+  private routeTablehasChanged(oldRouteTable: RouteTable, newRouteTable: RouteTable): boolean {
     if (oldRouteTable.size !== newRouteTable.size) {
-      // console.log(`${this.logHead} The new route table has changed!`);
       return true;
     } else {
       oldRouteTable.forEach((val, key) => {
         const newEntry = newRouteTable.get(key);
         if (newEntry === undefined) {
-          // console.log(`${this.logHead} The new route table has changed!`);
           return true;
         } else if (newEntry.cost !== val.cost || newEntry.nextHop !== val.nextHop) {
-          // console.log(`${this.logHead} The new route table has changed!`);
           return true;
         }
       });
@@ -599,6 +622,21 @@ export class Router {
   }
 
   /**
+   * @description 将新接收到的LS与存储的LS对比，是否发生变化
+   * @private
+   */
+  private LinkStateIsSame(oldLS: Map<number, Neighbor> | undefined, newLS: Neighbor[]) {
+    if (oldLS == null || oldLS.size !== newLS.length) { return false; }
+    newLS.forEach(newNeighbor => {
+      const oldNeighbor = oldLS.get(newNeighbor.dest);
+      if (oldNeighbor == null || oldNeighbor.cost !== newNeighbor.cost) {
+        return false;
+      }
+    });
+    return true;
+  }
+
+  /**
    * @description 根据neighbors来更新AdjacencyList。
    * @private
    * @param {Neighbors} neighbors
@@ -646,6 +684,13 @@ export class Router {
    * @private
    */
   private LSUpdateAdjacencyListWithReceivedLS(origin: number, linkState: LSLinkState) {
+    const oldLS = this.adjacencyList.get(origin);
+    if (this.LinkStateIsSame(oldLS, linkState.neighbors)) {
+      return;
+    }
+    const stringifiableOldLS = (oldLS === undefined) ? undefined : this.stringifiableNeighbors(oldLS);
+    this.pushLog(`receive new link state of ${origin}`,
+      { old: stringifiableOldLS, new: linkState.neighbors });
     // 将linkState转化为Neighbors
     const newNeighborsOfNode: Neighbors = new Map();
     linkState.neighbors.forEach((neighbor) => {
@@ -662,7 +707,13 @@ export class Router {
       throw new Error("方法调用错了！");
     }
     const newRouteTable = this.LSRunDijkstra(adjacencyList);
-    this.routeTable = newRouteTable;
+    if (this.routeTablehasChanged(this.routeTable, newRouteTable)) {
+      this.pushLog(`route table has changed`,
+        { old: this.stringifiableRouteTable(this.routeTable), new: this.stringifiableRouteTable(newRouteTable) });
+      this.routeTable = newRouteTable;
+    } else {
+      this.pushLog(`route table is the same`, this.stringifiableRouteTable(this.routeTable));
+    }
     /*
     // 从AdjacencyList中删除那些已经无法到达的节点
     this.LSUpdateAdjacencyListWithRouteTable(newRouteTable);

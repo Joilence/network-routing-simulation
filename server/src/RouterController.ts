@@ -1,6 +1,9 @@
 import * as dgram from "dgram";
+import { Subject } from 'rxjs/Subject';
 
 import { Router } from './router';
+import { Log } from '../../types';
+
 export class RouterController {
   /**
    * @description 将客户端传来的ID映射为Router实例
@@ -9,14 +12,19 @@ export class RouterController {
    * @memberof RouterController
    */
   private readonly IdToRouter = new Map<number, Router>();
-  private nextAvailablePort = 9011;
+
+  private _logs: Subject<Log> = new Subject();
+  public logs = this._logs.asObservable();
+
   /**
    * @description 创建一个新的路由器实例
    * @returns 是否成功
    * @memberof RouterController
    */
-  public createRouter() {
-    const newRouter = new Router(this.nextAvailablePort++);
+  public createRouter(usePort: number) {
+    const newRouter = new Router(usePort, (msg: string, json?: any) => {
+      this._logs.next({ emitter: usePort, msg, json });
+    });
     newRouter.run();
     this.IdToRouter.set(newRouter.port, newRouter);
     return newRouter.port;
@@ -39,6 +47,9 @@ export class RouterController {
   }
 
   public clearRouters() {
+    this.IdToRouter.forEach(router => {
+      router.shutdown();
+    });
     this.IdToRouter.clear();
   }
 

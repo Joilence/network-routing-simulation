@@ -6,7 +6,8 @@ export enum Command {
   changeLinkCost,
   turnOnRouter,
   deleteRouter,
-  deleteLink
+  deleteLink,
+  log,
 }
 
 export interface ClientSend<T> {
@@ -27,4 +28,8 @@ export interface LinkParam {
   routerId1: number;
   routerId2: number;
   linkCost: number;
+}
+
+export interface Log {
+  emitter: number, msg: string, json: any
 }
