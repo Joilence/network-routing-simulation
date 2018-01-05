@@ -6,6 +6,6 @@
   border: 1px solid black;
 }
 
-.showJSON {
-  white-space: pre
+hr {
+  margin: 5px 0;
 }

@@ -33,7 +33,10 @@ export class NetworkService {
   constructor(private backendService: BackendService) {
     backendService.nodeInfo.subscribe(message => {
       if (this.panel.showObject.id === message.data.routerId) {
-        this.panel.showObject.routerInfo = message.data;
+        this.panel.showObject = {
+          ...this.panel.showObject,
+          routerInfo: message.data
+        };
       }
     });
 
