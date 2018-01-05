@@ -628,13 +628,14 @@ export class Router {
    */
   private LinkStateIsSame(oldLS: Map<number, Neighbor> | undefined, newLS: Neighbor[]) {
     if (oldLS == null || oldLS.size !== newLS.length) { return false; }
+    let isSame = true;
     newLS.forEach(newNeighbor => {
       const oldNeighbor = oldLS.get(newNeighbor.dest);
       if (oldNeighbor == null || oldNeighbor.cost !== newNeighbor.cost) {
-        return false;
+        isSame = false;
       }
     });
-    return true;
+    return isSame;
   }
 
   /**
@@ -690,7 +691,7 @@ export class Router {
       return;
     }
     const stringifiableOldLS = (oldLS === undefined) ? undefined : this.stringifiableNeighbors(oldLS);
-    this.pushLog(`receive new link state of ${origin}`,
+    this.pushLog(`receive different link state of ${origin}`,
       { old: stringifiableOldLS, new: linkState.neighbors });
     // 将linkState转化为Neighbors
     const newNeighborsOfNode: Neighbors = new Map();
