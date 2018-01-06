@@ -530,6 +530,10 @@ export class Router {
     this.pushLog(`the route towards ${poisonedDest} is poisoned for 5s`, this.stringifiableRouteTable(this.routeTable));
     setTimeout(() => {
       this.routeTable.delete(poisonedDest);
+      // 5s以后，我们认为毒化信息已经传播到整个网络，网络中的错误路由信息已经清除，可以解除该路由的毒化
+      // 此时要再触发一次DV算法，利用网络稳定后的neighborsDVs（不包含错误路由信息）来计算出自己的DV
+      this.pushLog(`the poisoning for ${poisonedDest} is ended`);
+      this.respondToNeighborsDVsChange(this.neighbors, this.neighborsDVs);
     }, 5 * 1000);
   }
 
@@ -637,7 +641,11 @@ export class Router {
       }
       dv.forEach((item, dest) => {
         if (this.isPoisoned(dest)) {
-          // 对于被毒化的目标节点，在路由计算中忽略它，后面会将所有被毒化的路由cost设为无穷
+          // 对于已经被毒化的目标节点，在路由计算中忽略它，下面会统一将所有被毒化的路由cost设为无穷
+          return;
+        }
+        if (!Number.isSafeInteger(item.cost)) {
+          // 对于毒化的路由通告，直接忽略它，不使用它来计算DV
           return;
         }
         const rtItem = newRouteTable.get(dest);
