@@ -512,6 +512,7 @@ export class Router {
   /**
    * @description 毒化一个目标节点。
    * 一段时间内，在执行DV算法时，不管其他邻居的DV是否能到达p，输出的DV中都包含毒化条目：（p, ∞）
+   * 对于被毒化的路由，nextHop===-3表示这个路由被毒化后还没有更新路由表，nextHop===-2表示这个路由被毒化后已经更新过路由表
    * @private
    * @param {number} poisonedDest
    */
@@ -525,8 +526,8 @@ export class Router {
       // 此目标节点已经被毒化
       return;
     }
-    this.pushLog(`the route towards ${poisonedDest} is poisoned for 5s`);
-    this.routeTable.set(poisonedDest, { dest: poisonedDest, cost: Router.INFINITE_COST, nextHop: -2 });
+    this.routeTable.set(poisonedDest, { dest: poisonedDest, cost: Router.INFINITE_COST, nextHop: -3 });
+    this.pushLog(`the route towards ${poisonedDest} is poisoned for 5s`, this.stringifiableRouteTable(this.routeTable));
     setTimeout(() => {
       this.routeTable.delete(poisonedDest);
     }, 5 * 1000);
@@ -636,9 +637,7 @@ export class Router {
       }
       dv.forEach((item, dest) => {
         if (this.isPoisoned(dest)) {
-          // 对于被毒化的目标节点，将cost设为无穷
-          // 而不管是否有邻居节点可以去往它
-          newRouteTable.set(dest, { dest: dest, cost: Router.INFINITE_COST, nextHop: -2 });
+          // 对于被毒化的目标节点，在路由计算中忽略它，后面会将所有被毒化的路由cost设为无穷
           return;
         }
         const rtItem = newRouteTable.get(dest);
@@ -646,6 +645,11 @@ export class Router {
           newRouteTable.set(dest, { dest: dest, cost: neighborInfo.cost + item.cost, nextHop: neighbor });
         }
       });
+    });
+    this.routeTable.forEach((item, dest) => {
+      if (!Number.isSafeInteger(item.cost)) {
+        newRouteTable.set(dest, { dest: dest, cost: Router.INFINITE_COST, nextHop: -2 });
+      }
     });
     return newRouteTable;
   }
