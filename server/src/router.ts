@@ -65,6 +65,8 @@ export class Router {
    */
   private routeTable: RouteTable = new Map();
 
+  private static readonly INFINITE_COST = Number.MAX_SAFE_INTEGER + 1;
+
   /**
    * @description Router State
    */
@@ -478,15 +480,22 @@ export class Router {
    */
   private DVUpdateNeighborsDVsWithNeighbors(neighbors: Neighbors): void {
     // Delete DV of routers that are not neighbors any more
-    this.neighborsDVs.forEach((value, key, map) => {
-      if (neighbors.get(key) === undefined) {
-        this.neighborsDVs.delete(key);
+    this.neighborsDVs.forEach((neighborDV, neighborPort) => {
+      if (!neighbors.has(neighborPort)) {
+        // 此邻居不再直连
+        this.neighborsDVs.delete(neighborPort);
+        this.routeTable.forEach((routeTableItem, routeDest) => {
+          if (routeTableItem.nextHop === neighborPort) {
+            // 此目标节点将被毒化
+            this.poisonRoute(routeDest);
+          }
+        });
       }
     });
     // Add DV of new neighbors
     neighbors.forEach((neighbor, neighborPort) => {
-      if (this.neighborsDVs.get(neighborPort) === undefined) {
-        // 如果发现A是本节点的邻居，但neighborsDVs中没有A的DV，那么为A初始化一个DV
+      if (!this.neighborsDVs.has(neighborPort)) {
+        // 如果发现A是本节点的邻居，但neighborsDVs中没有A的DV，说明A是刚连接的邻居，为A初始化一个DV
         // 初始化的DV必须包括A到A自己的DVItem（cost为0），这样在DV算法中才能得到从本节点到A的路由
         const newDV: DV = new Map();
         newDV.set(neighborPort, {
@@ -498,6 +507,34 @@ export class Router {
     });
     // Update route table because neighborsDV change
     this.respondToNeighborsDVsChange(neighbors, this.neighborsDVs);
+  }
+
+  /**
+   * @description 毒化一个目标节点。
+   * 一段时间内，在执行DV算法时，不管其他邻居的DV是否能到达p，输出的DV中都包含毒化条目：（p, ∞）
+   * @private
+   * @param {number} poisonedDest
+   */
+  private poisonRoute(poisonedDest: number) {
+    if (poisonedDest === this.port) { throw new Error(`不能毒化自己`); }
+    const routeTableItem = this.routeTable.get(poisonedDest);
+    if (routeTableItem === undefined) {
+      throw new Error(`毒化p的前提是存在p的路由表条目`);
+    }
+    if (!Number.isSafeInteger(routeTableItem.cost)) {
+      // 此目标节点已经被毒化
+      return;
+    }
+    this.pushLog(`the route towards ${poisonedDest} is poisoned for 5s`);
+    this.routeTable.set(poisonedDest, { dest: poisonedDest, cost: Router.INFINITE_COST, nextHop: -2 });
+    setTimeout(() => {
+      this.routeTable.delete(poisonedDest);
+    }, 5 * 1000);
+  }
+
+  private isPoisoned(poisonedDest: number) {
+    const routeTableItem = this.routeTable.get(poisonedDest);
+    return routeTableItem !== undefined && !Number.isSafeInteger(routeTableItem.cost);
   }
 
   /**
@@ -515,6 +552,14 @@ export class Router {
     this.pushLog(`receive different DV from ${origin}`, { new: dv, old: this.stringifiableNeighbors(oldDv) });
     const newDV: DV = new Map();
     dv.forEach(item => {
+      if (!Number.isSafeInteger(item.cost)) {
+        // 这是一个毒化的路由通告
+        const routeToPoisonedNode = this.routeTable.get(item.dest);
+        if (routeToPoisonedNode !== undefined && routeToPoisonedNode.nextHop === origin) {
+          // 如果来自邻居i的DV通告中包含毒化条目：（p, ∞），且自己当前的路由表中，去往p的NextHop恰好是i，则毒化p节点
+          this.poisonRoute(item.dest);
+        }
+      }
       newDV.set(item.dest, { dest: item.dest, cost: item.cost });
     });
     this.neighborsDVs.set(origin, newDV);
@@ -573,7 +618,7 @@ export class Router {
   }
 
   /**
-   * @description DV算法的实现。
+   * @description DV算法的实现。对于被毒化的、去往p的路由，需要存在条目{dest:p,cost:∞,nextHop:-2}
    * @private
    * @param {Neighbors} neighbors
    * @param {Map<number, DV>} neighborsDVs
@@ -590,6 +635,12 @@ export class Router {
         throw new Error(`${this.logHead} neighbor found in neighborsDVs is not found in neighbors!`);
       }
       dv.forEach((item, dest) => {
+        if (this.isPoisoned(dest)) {
+          // 对于被毒化的目标节点，将cost设为无穷
+          // 而不管是否有邻居节点可以去往它
+          newRouteTable.set(dest, { dest: dest, cost: Router.INFINITE_COST, nextHop: -2 });
+          return;
+        }
         const rtItem = newRouteTable.get(dest);
         if (rtItem === undefined || rtItem.cost > neighborInfo.cost + item.cost) {
           newRouteTable.set(dest, { dest: dest, cost: neighborInfo.cost + item.cost, nextHop: neighbor });
