@@ -23,7 +23,7 @@ export class RouterController {
    */
   public createRouter(usePort: number) {
     const newRouter = new Router(usePort, (msg: string, json?: any) => {
-      this._logs.next({ emitter: usePort, msg, json });
+      this._logs.next({ emitter: usePort + 'log', msg, json });
     });
     newRouter.run();
     this.IdToRouter.set(newRouter.port, newRouter);

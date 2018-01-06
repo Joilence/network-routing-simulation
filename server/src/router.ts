@@ -104,7 +104,7 @@ export class Router {
 
   constructor(port: number,
     logFunc: (msg: string, json?: any) => void,
-    algorithm: RoutingAlgorithm = RoutingAlgorithm.ls,
+    algorithm: RoutingAlgorithm = RoutingAlgorithm.dv,
     isCenter?: boolean,
     centerPort?: number) {
     this.port = port;
@@ -506,6 +506,13 @@ export class Router {
    */
   private DVUpdateNeighborsDVsWithReceivedDV(origin: number, dv: DVItem[]): void {
     if (!this.neighbors.has(origin)) { throw new Error(`${this.logHead} 从不是邻居的节点收到DV`); }
+    const oldDv = this.neighborsDVs.get(origin);
+    if (oldDv == null) { throw new Error(`${this.logHead} oldDv == null!`); }
+    if (this.DVIsSame(oldDv, dv)) {
+      this.pushLog(`receive same DV from ${origin}`, dv);
+      return;
+    }
+    this.pushLog(`receive different DV from ${origin}`, { new: dv, old: this.stringifiableNeighbors(oldDv) });
     const newDV: DV = new Map();
     dv.forEach(item => {
       newDV.set(item.dest, { dest: item.dest, cost: item.cost });
@@ -514,15 +521,31 @@ export class Router {
     this.respondToNeighborsDVsChange(this.neighbors, this.neighborsDVs);
   }
 
+  private DVIsSame(oldDV: Map<number, DVItem>, newDV: DVItem[]) {
+    if (oldDV.size !== newDV.length) { return false; }
+    let isSame = true;
+    newDV.forEach(newDVItem => {
+      const oldDVItem = oldDV.get(newDVItem.dest);
+      if (oldDVItem == null || oldDVItem.cost !== newDVItem.cost) {
+        isSame = false;
+      }
+    });
+    return isSame;
+  }
+
   private respondToNeighborsDVsChange(neighbors: Neighbors, neighborsDVs: Map<number, DV>) {
     if (this.algorithm !== RoutingAlgorithm.dv) {
       throw new Error(`${this.logHead} Calling respondToNeighborsDVsChange() when the mode is not 'dv'!`);
     }
     const newRouteTable = this.DVComputeRouteTable(neighbors, neighborsDVs);
     if (this.routeTablehasChanged(this.routeTable, newRouteTable)) {
+      this.pushLog(`route table has changed`,
+        { old: this.stringifiableRouteTable(this.routeTable), new: this.stringifiableRouteTable(newRouteTable) });
       // 如果新的路由表与之前的路由表相比有发生变化，才发送DV通告
       this.routeTable = newRouteTable;
       this.DVInformNeighbors(newRouteTable);
+    } else {
+      this.pushLog(`route table is the same`, this.stringifiableRouteTable(this.routeTable));
     }
   }
 

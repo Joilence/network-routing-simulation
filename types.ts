@@ -31,5 +31,5 @@ export interface LinkParam {
 }
 
 export interface Log {
-  emitter: number, msg: string, json: any
+  emitter: string, msg: string, json: any
 }
