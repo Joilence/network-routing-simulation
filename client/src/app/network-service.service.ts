@@ -107,6 +107,7 @@ export class NetworkService {
     const options = {
       physics: {
         barnesHut: {
+          springLength: 180,
           springConstant: 0.01,
           damping: 1
         },
@@ -247,15 +248,26 @@ export class NetworkService {
     this.backendService.addNode();
     this.backendService.addNode();
     this.backendService.addNode();
+    this.backendService.addNode();
+    this.backendService.addNode();
     this.nodesWaitingToBeCreated.next({ x: 0, y: 0 });
-    this.nodesWaitingToBeCreated.next({ x: 20, y: 20 });
-    this.nodesWaitingToBeCreated.next({ x: 40, y: 40 });
-    this.backendService.createdNode.bufferCount(3).take(1).subscribe(([m1, m2, m3]) => {
+    this.nodesWaitingToBeCreated.next({ x: 0, y: 50 });
+    this.nodesWaitingToBeCreated.next({ x: 60, y: 0 });
+    this.nodesWaitingToBeCreated.next({ x: 60, y: 50 });
+    this.nodesWaitingToBeCreated.next({ x: 100, y: 30 });
+    this.backendService.createdNode.bufferCount(5).take(1).subscribe(([m1, m2, m3, m4, m5]) => {
       const nodeId1 = m1.data.routerId;
       const nodeId2 = m2.data.routerId;
       const nodeId3 = m3.data.routerId;
-      this.backendService.addEdge(nodeId1, nodeId2, 30);
-      this.backendService.addEdge(nodeId2, nodeId3, 50);
+      const nodeId4 = m4.data.routerId;
+      const nodeId5 = m5.data.routerId;
+      this.backendService.addEdge(nodeId1, nodeId2, 20);
+      this.backendService.addEdge(nodeId2, nodeId3, 20);
+      this.backendService.addEdge(nodeId1, nodeId4, 5);
+      this.backendService.addEdge(nodeId4, nodeId3, 30);
+      this.backendService.addEdge(nodeId1, nodeId5, 25);
+      this.backendService.addEdge(nodeId5, nodeId3, 10);
+      this.backendService.addEdge(nodeId4, nodeId5, 15);
     });
   }
 
