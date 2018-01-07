@@ -21,7 +21,7 @@ https://www.processon.com/view/link/5a410029e4b0909c1aa58541
 ![模拟路由器设计图.png](http://upload-images.jianshu.io/upload_images/4888929-65af2c69ba45daab.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 
 ### 路由器类的主要成员
-* prot是本路由器的监听的端口。**路由器与路由器之间通过UDP socket进行通信**（交换路由信息、发送普通消息报文）。由于prot肯定是全局唯一的，因此我们也将它用作路由器的标识符。
+* prot是本路由器的监听的端口。**路由器与路由器之间通过UDP socket进行通信**（交换路由信息、发送普通消息报文）。由于port肯定是全局唯一的，因此我们也将它用作路由器的标识符。
 * neighbors存储直连的邻居信息，包括邻居的port、链路的cost。为了加速查询，它的数据结构是一个以邻居port为key的Map。
     * 它是网络拓扑变化的根本来源，它的更新会触发ls算法或dv算法的执行、ls广播或dv通告。
     * 当修改网络拓扑时，修改它，网络拓扑的变化信息就能扩散到整个网络
@@ -77,6 +77,7 @@ https://www.processon.com/view/link/5a410029e4b0909c1aa58541
 
 # 阅读资料
 《计算机网络 自顶向下方法 第六版》
+
 https://en.wikipedia.org/wiki/Link-state_routing_protocol
 https://en.wikipedia.org/wiki/Distance-vector_routing_protocol
 https://en.wikipedia.org/wiki/Routing_loop_problem
