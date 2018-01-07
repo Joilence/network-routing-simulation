@@ -14,11 +14,11 @@ import { NetworkService } from '../network-service.service';
 })
 export class PanelComponent implements OnInit {
 
-  private mode: PanelMode;
+  public mode: PanelMode;
 
   public showObject;
 
-  constructor(private networkService: NetworkService) { }
+  constructor(public networkService: NetworkService) { }
 
   ngOnInit() {
   }
