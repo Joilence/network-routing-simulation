@@ -133,6 +133,11 @@ export class NetworkService {
             callback(null);
             return;
           }
+          if (edgeData.from === edgeData.to) {
+            alert(`不能创建自己到自己的链路`);
+            callback(null);
+            return;
+          }
           const edges = this.edges.get({
             filter: (edge) =>
               (edge.from === edgeData.from && edge.to === edgeData.to)
@@ -179,6 +184,12 @@ export class NetworkService {
     network.on("selectEdge", (params) => {
       const edge = this.edges.get(params.edges[0]);
       this.panel.showEdge(edge);
+    });
+    network.on("deselectNode", () => {
+      this.panel.showNothing();
+    });
+    network.on("deselectEdge", () => {
+      this.panel.showNothing();
     });
   }
 
@@ -246,5 +257,18 @@ export class NetworkService {
       this.backendService.addEdge(nodeId1, nodeId2, 30);
       this.backendService.addEdge(nodeId2, nodeId3, 50);
     });
+  }
+
+  sendMsg(fromRouter: number, sendStr: string, toRouter: number) {
+    if (fromRouter === toRouter) {
+      alert(`不能发包给自己`);
+      return;
+    }
+    const fromNode = this.nodes.get(fromRouter);
+    if (fromNode == null) {
+      alert(`路由器${fromNode}不存在！`);
+      return;
+    }
+    this.backendService.sendMsg(fromRouter, sendStr, toRouter);
   }
 }

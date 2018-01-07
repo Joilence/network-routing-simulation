@@ -96,4 +96,10 @@ export class RouterController {
     router1.disconnect(routerId2);
     router2.disconnect(routerId1);
   }
+
+  public routerCommunicate(sender: number, receiver: number, message: string) {
+    const router1 = this.IdToRouter.get(sender);
+    if (router1 === undefined) { throw new Error(`sender：${sender}不存在`); }
+    router1.sendMessage(receiver, message);
+  }
 }

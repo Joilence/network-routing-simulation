@@ -8,6 +8,7 @@ export enum Command {
   deleteRouter,
   deleteLink,
   log,
+  communicate,
 }
 
 export interface ClientSend<T> {
@@ -32,4 +33,9 @@ export interface LinkParam {
 
 export interface Log {
   emitter: string, msg: string, json: any
+}
+export interface Communicate {
+  sender: number;
+  receiver: number;
+  message: string;
 }

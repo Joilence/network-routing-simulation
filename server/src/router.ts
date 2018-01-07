@@ -299,7 +299,13 @@ export class Router {
   */
 
   public sendMessage(dest: number, msg: string) {
-    this.pushLog(`sending message "${msg}" to ${dest}`);
+    if (dest === this.port) {
+      throw new Error(`不能发包给自己`);
+    }
+    const route = this.routeTable.get(dest);
+    if (route !== undefined && Number.isSafeInteger(route.cost)) {
+      this.pushLog(`sending message "${msg}" to ${dest}, nextHop: ${route.nextHop}`);
+    }
     this.sendPacket(dest, {
       src: this.port,
       dest: dest,
@@ -346,13 +352,16 @@ export class Router {
       console.warn(`${this.logHead} 路由器尝试在${this.state}状态下发包，没有成功发出`);
       return;
     }
+    if (dest === this.port) {
+      throw new Error(`不能发包给自己`);
+    }
     // Query route table
     const entry = this.routeTable.get(dest);
     let outPort = -1;
-    if (entry !== undefined) {
+    if (entry !== undefined && Number.isSafeInteger(entry.cost)) {
       outPort = entry.nextHop;
     } else {
-      console.warn(`${this.logHead} sendPacket unknown router ${dest}`);
+      this.pushLog(`can't sendPacket to unknown router: ${dest}`, packet);
       return;
     }
     // Get out port number and send packet
@@ -413,9 +422,9 @@ export class Router {
       } else { // pkt to forward
         const entry = this.routeTable.get(packet.dest);
         if (entry !== undefined) {
-          this.pushLog(`forward packet to ${entry.nextHop}`, packet);
+          this.pushLog(`forward message packet to ${entry.nextHop}`, packet);
         } else {
-          this.pushLog(`don't know where to forward the packet!`, packet);
+          this.pushLog(`don't know where to forward the message packet!`, packet);
         }
         this.sendPacket(packet.dest, packet);
       }
@@ -530,11 +539,11 @@ export class Router {
     this.pushLog(`the route towards ${poisonedDest} is poisoned for 5s`, this.stringifiableRouteTable(this.routeTable));
     setTimeout(() => {
       this.routeTable.delete(poisonedDest);
-      // 5s以后，我们认为毒化信息已经传播到整个网络，网络中的错误路由信息已经清除，可以解除该路由的毒化
+      // 3s以后，我们认为毒化信息已经传播到整个网络，网络中的错误路由信息已经清除，可以解除该路由的毒化
       // 此时要再触发一次DV算法，利用网络稳定后的neighborsDVs（不包含错误路由信息）来计算出自己的DV
       this.pushLog(`the poisoning for ${poisonedDest} is ended`);
       this.respondToNeighborsDVsChange(this.neighbors, this.neighborsDVs);
-    }, 5 * 1000);
+    }, 3 * 1000);
   }
 
   private isPoisoned(poisonedDest: number) {

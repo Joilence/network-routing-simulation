@@ -9,6 +9,7 @@ import {
   NodeParam,
   LinkParam,
   Log,
+  Communicate,
 } from '../../types';
 
 const wss = new WebSocket.Server({ port: 8999 });
@@ -98,6 +99,13 @@ wss.on('connection', (ws: WebSocket) => {
         const res8: ServerSend<LinkParam> =
           { command: Command.deleteLink, isSuccess: true, data: { routerId1, routerId2, linkCost: -1 } };
         ws.send(JSON.stringify(res8));
+        break;
+      case Command.communicate:
+        const { sender, receiver, message: msg } = (receivedObject as ClientSend<Communicate>).parameters;
+        routerController.routerCommunicate(sender, receiver, msg);
+        const res9: ServerSend<null> =
+          { command: Command.communicate, isSuccess: true, data: null };
+        ws.send(JSON.stringify(res9));
         break;
     }
   });

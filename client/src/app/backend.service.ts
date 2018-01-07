@@ -6,6 +6,7 @@ import {
   NodeParam,
   LinkParam,
   Log,
+  Communicate,
 } from '../../../types';
 
 import { Observable } from 'rxjs/Observable';
@@ -154,6 +155,18 @@ export class BackendService {
       command: Command.changeLinkCost,
       parameters: {
         routerId1, routerId2, linkCost
+      }
+    };
+    this.socket.send(JSON.stringify(sendObj));
+  }
+
+  sendMsg(fromRouter: number, sendStr: string, toRouter: number) {
+    const sendObj: ClientSend<Communicate> = {
+      command: Command.communicate,
+      parameters: {
+        sender: fromRouter,
+        receiver: toRouter,
+        message: sendStr
       }
     };
     this.socket.send(JSON.stringify(sendObj));

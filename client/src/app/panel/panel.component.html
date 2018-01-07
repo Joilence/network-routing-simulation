@@ -4,6 +4,18 @@
 <div [ngSwitch]="mode">
   <div *ngSwitchCase="0">
     <t-json-viewer [json]="showObject" [maxCollapsedLength]="40" [expandAll]="true"></t-json-viewer>
+    <hr>
+    <div *ngIf="!showObject.shutdown">
+      <div>
+        发送消息：
+        <input type="text" [(ngModel)]="sendStr">
+        <br> 到路由器：
+        <input type="number" [(ngModel)]="toRouter">
+        <br>
+        <button (click)="sendMsg(sendStr, toRouter);">确认</button>
+      </div>
+      <hr>
+    </div>
     <button *ngIf="!showObject.shutdown" (click)="networkService.shutdownRouter(showObject.id);">关闭路由器</button>
     <button *ngIf="showObject.shutdown" (click)="networkService.turnOnRouter(showObject.id)">重新打开路由器</button>
   </div>

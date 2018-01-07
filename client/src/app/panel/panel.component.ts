@@ -27,6 +27,11 @@ export class PanelComponent implements OnInit {
     this.mode = PanelMode.showNode;
     this.showObject = node;
   }
+  sendStr: string;
+  toRouter: number;
+  sendMsg(sendStr: string, toRouter: number) {
+    this.networkService.sendMsg(this.showObject.id, sendStr, toRouter);
+  }
 
   linkCost: number;
   showEdge(edge: any) {
@@ -37,6 +42,10 @@ export class PanelComponent implements OnInit {
 
   changeLinkCost(routerId1: number, routerId2: number, linkCost: number) {
     this.networkService.changeLinkCost(routerId1, routerId2, linkCost);
+    this.mode = null;
+  }
+
+  showNothing() {
     this.mode = null;
   }
 }
